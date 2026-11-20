@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Link WhatsApp Device - PulseSend</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22%20%220%22%20width=%22100%22%20height=%22100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+    <style>
+        :root {
+            --bg-dark: #0c1317;
+            --panel-bg: #111b21;
+            --card-border: #222e35;
+            --accent: #00a884;
+            --text-main: #e9edef;
+            --text-muted: #8696a0;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body {
+            background: var(--bg-dark); color: var(--text-main);
+            min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;
+        }
+        .container {
+            background: var(--panel-bg); border: 1px solid var(--card-border);
+            border-radius: 20px; padding: 32px 28px; max-width: 480px; width: 100%; text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+        .logo { font-size: 36px; margin-bottom: 10px; }
+        h1 { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+        .session-badge {
+            display: inline-block; background: rgba(0, 168, 132, 0.15); color: var(--accent);
+            padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 20px;
+        }
+        .qr-card {
+            background: #fff; border-radius: 16px; padding: 20px; width: fit-content;
+            margin: 0 auto 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        .qr-card img { width: 230px; height: 230px; display: block; object-fit: contain; }
+        .instructions {
+            text-align: left; background: #182229; border: 1px solid var(--card-border);
+            border-radius: 12px; padding: 16px 18px; font-size: 13px; line-height: 1.6; color: #cbd5e1;
+        }
+        .instructions strong { color: var(--accent); }
+        .instructions ol { padding-left: 20px; margin-top: 6px; }
+        .instructions li { margin-bottom: 4px; }
+        .status-pill {
+            margin-top: 16px; display: inline-flex; align-items: center; gap: 6px;
+            font-size: 13px; color: var(--text-muted);
+        }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .connected-view { display: none; padding: 20px 0; }
+        .success-icon { font-size: 60px; margin-bottom: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">⚡</div>
+        <h1>Link WhatsApp Device</h1>
+        <div class="session-badge" id="sessionTag">Session: default</div>
+
+        <!-- Disconnected View (QR) -->
+        <div id="scanView">
+            <div class="qr-card">
+                <img id="qrImg" src="" alt="WhatsApp QR Code" style="display: none;">
+                <div id="qrLoading" style="width: 230px; height: 230px; display: flex; align-items: center; justify-content: center; color: #666; font-size: 14px;">
+                    Loading QR Code...
+                </div>
+            </div>
+
+            <div class="instructions">
+                <strong>તમારા મોબાઈલમાંથી લિંક કરવાના સ્ટેપ:</strong>
+                <ol>
+                    <li>તમારા ફોનમાં <strong>WhatsApp</strong> ખોલો.</li>
+                    <li>ઉપર જમણી બાજુ <strong>૩ ટપકાં (⁝) ➔ Linked Devices</strong> પર જાઓ.</li>
+                    <li><strong>Link a device</strong> બટન દબાવો.</li>
+                    <li>ઉપર દેખાતો <strong>QR કોડ કેમેરાથી સ્કેન કરી લો!</strong></li>
+                </ol>
+            </div>
+
+            <div class="status-pill">
+                <span class="dot"></span>
+                <span id="statusLabel">સ્કેન કરવા તૈયાર (Waiting for scan)...</span>
+            </div>
+        </div>
+
+        <!-- Connected View -->
+        <div id="connectedView" class="connected-view">
+            <div class="success-icon">🎉</div>
+            <h2 style="color: #4ade80; font-size: 20px; margin-bottom: 8px;">WhatsApp Connected!</h2>
+            <p style="color: var(--text-main); font-size: 15px; margin-bottom: 12px;" id="phoneLabel">Connected Phone: +91...</p>
+            <p style="color: var(--text-muted); font-size: 13px;">
+                આ ડિવાઇસ સફળતાપૂર્વક જોડાઈ ગયું છે. તમે આ ટેબ બંધ કરી શકો છો.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const session = urlParams.get('session') || 'default';
+        document.getElementById('sessionTag').innerText = 'Device Session: ' + session;
+
+        async function check() {
+            try {
+                const res = await fetch('/api/status?session=' + encodeURIComponent(session));
+                const data = await res.json();
+
+                if (data.connected) {
+                    document.getElementById('scanView').style.display = 'none';
+                    document.getElementById('connectedView').style.display = 'block';
+                    document.getElementById('phoneLabel').innerText = 'Connected: +' + data.phone;
+                } else {
+                    document.getElementById('scanView').style.display = 'block';
+                    document.getElementById('connectedView').style.display = 'none';
+
+                    if (data.qr) {
+                        const img = document.getElementById('qrImg');
+                        img.src = data.qr;
+                        img.style.display = 'block';
+                        document.getElementById('qrLoading').style.display = 'none';
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        setInterval(check, 3000);
+        check();
+    </script>
+</body>
+</html>

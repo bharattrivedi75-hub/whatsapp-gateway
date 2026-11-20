@@ -96,7 +96,7 @@ async function initSocket(session) {
             auth: state,
             logger: pino({ level: 'silent' }),
             printQRInTerminal: false,
-            browser: Browsers ? Browsers.ubuntu('Chrome') : ['Ubuntu', 'Chrome', '22.04.4'],
+            browser: Browsers ? Browsers.macOS('Desktop') : ['macOS', 'Chrome', '124.0.0'],
             keepAliveIntervalMs: 25000,
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
@@ -649,6 +649,11 @@ app.get('/', (req, res) => {
 
 app.get('/web', (req, res) => {
     res.sendFile(path.join(__dirname, 'web.html'));
+});
+
+// Dedicated Device Link & QR Landing Page
+app.get('/link', (req, res) => {
+    res.sendFile(path.join(__dirname, 'link.html'));
 });
 
 app.listen(PORT, '0.0.0.0', () => {
