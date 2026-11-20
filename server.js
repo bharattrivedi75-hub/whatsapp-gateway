@@ -83,18 +83,37 @@ async function initSocket(session) {
 
         session.connectionState = 'CONNECTING';
 
+        if (session.sock) {
+            try {
+                session.sock.ev.removeAllListeners();
+                session.sock.end();
+            } catch (_) {}
+        }
+
         const sock = makeWASocket({
             version,
             auth: state,
             logger: pino({ level: 'silent' }),
             printQRInTerminal: false,
-            browser: Browsers ? Browsers.ubuntu('Chrome') : ['Ubuntu', 'Chrome', '22.04.4']
+            browser: Browsers ? Browsers.ubuntu('Chrome') : ['Ubuntu', 'Chrome', '22.04.4'],
+            keepAliveIntervalMs: 25000,
+            connectTimeoutMs: 60000,
+            defaultQueryTimeoutMs: 60000,
+            emitOwnEvents: false,
+            markOnlineOnConnect: true,
+            syncFullHistory: false
         });
 
         session.sock = sock;
         session.isStarting = false;
 
-        sock.ev.on('creds.update', saveCreds);
+        sock.ev.on('creds.update', async () => {
+            try {
+                await saveCreds();
+            } catch (err) {
+                console.error(`[Session ${session.id}] Save creds error:`, err);
+            }
+        });
 
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
@@ -120,19 +139,27 @@ async function initSocket(session) {
 
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-                session.connectionState = 'DISCONNECTED';
-                session.connectedUser = null;
-                session.currentQR = null;
-                session.pairingCode = null;
+                const isRestartRequired = statusCode === 515;
+                const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+                const shouldReconnect = !isLoggedOut;
 
-                console.log(`[Session ${session.id}] Connection closed (${statusCode}), reconnect: ${shouldReconnect}`);
+                console.log(`[Session ${session.id}] Connection closed (status: ${statusCode}), restartRequired: ${isRestartRequired}, reconnect: ${shouldReconnect}`);
 
                 if (shouldReconnect) {
                     session.reconnectAttempts++;
-                    const delay = Math.min(session.reconnectAttempts * 3000, 15000);
+                    // If stream restart (515) or temporary network blip, keep state CONNECTING
+                    if (isRestartRequired || session.connectedUser) {
+                        session.connectionState = 'CONNECTING';
+                    } else {
+                        session.connectionState = 'DISCONNECTED';
+                    }
+                    const delay = isRestartRequired ? 1500 : Math.min(session.reconnectAttempts * 2000, 10000);
                     setTimeout(() => initSocket(session), delay);
                 } else {
+                    session.connectionState = 'DISCONNECTED';
+                    session.connectedUser = null;
+                    session.currentQR = null;
+                    session.pairingCode = null;
                     console.log(`[Session ${session.id}] Logged out. Clearing credentials...`);
                     try {
                         fs.rmSync(session.authFolder, { recursive: true, force: true });
