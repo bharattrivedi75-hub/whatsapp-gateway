@@ -96,7 +96,7 @@ async function initSocket(session) {
             auth: state,
             logger: pino({ level: 'silent' }),
             printQRInTerminal: false,
-            browser: Browsers ? Browsers.macOS('Desktop') : ['macOS', 'Chrome', '124.0.0'],
+            browser: Browsers ? Browsers.ubuntu('Chrome') : ['Ubuntu', 'Chrome', '22.04.4'],
             keepAliveIntervalMs: 25000,
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
@@ -276,8 +276,20 @@ app.post('/api/pairing-code', async (req, res) => {
         }
 
         if (!session.sock.authState.creds.registered) {
-            // Wait 1 second to make sure socket handshake is ready
-            await new Promise(r => setTimeout(r, 1200));
+            // Ensure completely fresh keys before generating pairing code so WhatsApp mobile never rejects with "Couldn't link device"
+            if (!session.sock.authState.creds.me) {
+                try {
+                    session.sock.ev.removeAllListeners();
+                    session.sock.end();
+                } catch (_) {}
+                try {
+                    fs.rmSync(session.authFolder, { recursive: true, force: true });
+                } catch (_) {}
+                session.sock = null;
+                session.isStarting = false;
+                await initSocket(session);
+                await new Promise(r => setTimeout(r, 2500));
+            }
             const rawCode = await session.sock.requestPairingCode(cleanDigits);
             // Format code nicely (e.g. ABCD-1234)
             const formattedCode = rawCode?.match(/.{1,4}/g)?.join('-') || rawCode;
