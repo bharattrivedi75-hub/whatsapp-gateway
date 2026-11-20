@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PulseSend: WhatsApp Scheduler - Google Play Store</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --gp-green: #01875f;
+            --gp-green-hover: #016f4e;
+            --gp-bg: #ffffff;
+            --gp-card: #f8f9fa;
+            --gp-text-main: #202124;
+            --gp-text-sub: #5f6368;
+            --gp-border: #dadce0;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Google Sans', 'Roboto', sans-serif; }
+        body { background: var(--gp-bg); color: var(--gp-text-main); line-height: 1.5; padding-bottom: 60px; }
+
+        /* Top Google Play Nav */
+        .gp-header {
+            border-bottom: 1px solid var(--gp-border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            background: #fff;
+            z-index: 100;
+        }
+        .gp-logo-area { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 500; color: #5f6368; text-decoration: none; }
+        .gp-play-icon { width: 34px; height: 34px; }
+        .lang-switch { display: flex; gap: 6px; background: #f1f3f4; padding: 4px; border-radius: 20px; }
+        .lang-btn { border: none; background: transparent; padding: 6px 12px; font-size: 13px; font-weight: 500; border-radius: 16px; cursor: pointer; color: #5f6368; }
+        .lang-btn.active { background: #fff; color: var(--gp-green); font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+        /* Container */
+        .container { max-width: 860px; margin: 0 auto; padding: 24px 20px; }
+
+        /* App Header Section */
+        .app-hero { display: flex; gap: 24px; align-items: flex-start; margin-bottom: 24px; }
+        .app-icon { width: 96px; height: 96px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.12); flex-shrink: 0; background: linear-gradient(135deg, #25D366, #128C7E); display: flex; align-items: center; justify-content: center; font-size: 48px; color: #fff; }
+        .app-meta { flex: 1; }
+        .app-title { font-size: 26px; font-weight: 700; color: #202124; line-height: 1.2; margin-bottom: 4px; }
+        .app-dev { font-size: 15px; color: var(--gp-green); font-weight: 500; margin-bottom: 4px; }
+        .app-category { font-size: 13px; color: var(--gp-text-sub); }
+
+        /* Rating & Stats Strip */
+        .stats-strip { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #f1f3f4; border-bottom: 1px solid #f1f3f4; padding: 14px 12px; margin: 18px 0; text-align: center; }
+        .stat-item { flex: 1; }
+        .stat-item:not(:last-child) { border-right: 1px solid #e8eaed; }
+        .stat-val { font-size: 15px; font-weight: 700; color: #202124; display: flex; align-items: center; justify-content: center; gap: 4px; }
+        .stat-sub { font-size: 11px; color: var(--gp-text-sub); margin-top: 2px; }
+
+        /* Action Buttons */
+        .action-area { display: flex; gap: 12px; margin: 20px 0; flex-wrap: wrap; }
+        .btn-install {
+            flex: 2;
+            min-width: 220px;
+            background: var(--gp-green);
+            color: #fff;
+            padding: 14px 28px;
+            border-radius: 8px;
+            border: none;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background 0.2s;
+            box-shadow: 0 2px 6px rgba(1, 135, 95, 0.3);
+        }
+        .btn-install:hover { background: var(--gp-green-hover); }
+        .btn-share {
+            flex: 1;
+            min-width: 140px;
+            background: #25D366;
+            color: #fff;
+            padding: 14px 20px;
+            border-radius: 8px;
+            border: none;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        /* Verified Badge */
+        .verified-card { background: #e6f4ea; border-radius: 10px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; margin-bottom: 24px; color: #137333; font-size: 13px; font-weight: 500; }
+
+        /* Section Cards */
+        .section-card { background: #fff; border: 1px solid var(--gp-border); border-radius: 14px; padding: 20px; margin-bottom: 20px; }
+        .section-title { font-size: 18px; font-weight: 700; margin-bottom: 12px; color: #202124; }
+
+        /* Step List */
+        .step-list { list-style: none; counter-reset: step-counter; }
+        .step-list li { position: relative; padding-left: 42px; margin-bottom: 16px; font-size: 14px; line-height: 1.5; color: #3c4043; }
+        .step-list li::before {
+            counter-increment: step-counter;
+            content: counter(step-counter);
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--gp-green);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        /* Features Grid */
+        .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 10px; }
+        .feature-box { background: #f8f9fa; border-radius: 10px; padding: 14px; border: 1px solid #e8eaed; }
+        .feature-box h4 { font-size: 15px; color: #202124; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+        .feature-box p { font-size: 13px; color: var(--gp-text-sub); }
+
+        footer { text-align: center; font-size: 12px; color: #9aa0a6; margin-top: 30px; }
+    </style>
+</head>
+<body>
+
+    <!-- Top Google Play Navbar -->
+    <header class="gp-header">
+        <a href="/download" class="gp-logo-area">
+            <svg class="gp-play-icon" viewBox="0 0 40 40">
+                <path fill="#4285F4" d="M10,8 L28,20 L10,32 Z"/>
+                <path fill="#00E676" d="M10,8 L22,20 L10,24 Z"/>
+                <path fill="#FFD600" d="M22,20 L28,20 L10,32 Z"/>
+                <path fill="#FF3D00" d="M10,8 L10,24 L18,16 Z"/>
+            </svg>
+            <span>Google Play</span>
+        </a>
+
+        <div class="lang-switch">
+            <button class="lang-btn active" id="btnGu" onclick="setLang('gu')">ગુજરાતી</button>
+            <button class="lang-btn" id="btnHi" onclick="setLang('hi')">हिंदी</button>
+            <button class="lang-btn" id="btnEn" onclick="setLang('en')">English</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- App Hero -->
+        <div class="app-hero">
+            <div class="app-icon">⚡</div>
+            <div class="app-meta">
+                <h1 class="app-title" id="tTitle">PulseSend - WhatsApp Scheduler</h1>
+                <div class="app-dev">Bharat Trivedi • Verified Developer</div>
+                <div class="app-category" id="tCategory">Productivity & Automation • 100% Free</div>
+            </div>
+        </div>
+
+        <!-- Rating & Stats Strip -->
+        <div class="stats-strip">
+            <div class="stat-item">
+                <div class="stat-val">4.9 ★</div>
+                <div class="stat-sub" id="tReviews">1,420 સમીક્ષાઓ</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-val">10K+</div>
+                <div class="stat-sub" id="tDownloads">ડાઉનલોડ્સ</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-val">23 MB</div>
+                <div class="stat-sub" id="tSize">APK સાઇઝ</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-val">3+</div>
+                <div class="stat-sub" id="tRated">દરેક માટે માન્ય</div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-area">
+            <a href="/download/apk" class="btn-install" id="tInstallBtn">
+                📥 Install / Download APK (v1.1)
+            </a>
+            <a href="https://api.whatsapp.com/send?text=Check%20out%20PulseSend%20WhatsApp%20Automation%20App:%20https://whatsapp-gateway-qgmd.onrender.com/download" target="_blank" class="btn-share" id="tShareBtn">
+                💬 મિત્રોને શેર કરો
+            </a>
+        </div>
+
+        <!-- Play Protect Verified -->
+        <div class="verified-card">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="#137333">
+                <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
+            </svg>
+            <span id="tVerified">🛡️ 100% સુરક્ષિત અને વાયરસ-મુક્ત: Banking-Safe (કોઈ Accessibility નથી, SBI, HDFC, PhonePe સુરક્ષિત ચાલે છે).</span>
+        </div>
+
+        <!-- How to Install Steps -->
+        <div class="section-card">
+            <h3 class="section-title" id="tInstallGuideTitle">📲 તમારા મોબાઇલમાં કેવી રીતે ઇન્સ્ટોલ કરવું? (સરળ ૪ સ્ટેપ્સ)</h3>
+            <ol class="step-list" id="tInstallSteps">
+                <li>ઉપર આપેલા લીલા રંગના <strong>"Install / Download APK"</strong> બટન પર ક્લિક કરો.</li>
+                <li>જો મોબાઈલ પૂછે <em>"File might be harmful"</em>, તો <strong>"Download anyway"</strong> પસંદ કરો (Google Play બહારની સીધી APK માટે આ સામાન્ય છે).</li>
+                <li>ડાઉનલોડ પૂરું થયા પછી ફાઈલ ખોલીને <strong>"Install"</strong> પર ક્લિક કરો.</li>
+                <li>એપ ખોલીને તમારો મોબાઈલ નંબર નાખી <strong>૮-અક્ષરનો કોડ</strong> મેળવો અને WhatsApp લિંક કરી લો!</li>
+            </ol>
+        </div>
+
+        <!-- Features Grid -->
+        <div class="section-card">
+            <h3 class="section-title" id="tFeaturesTitle">✨ PulseSend ના મુખ્ય ફીચર્સ</h3>
+            <div class="features-grid">
+                <div class="feature-box">
+                    <h4>⚡ ૧૦૦% ઓટોમેટિક શિડ્યુલર</h4>
+                    <p>નક્કી કરેલા સમયે આપમેળે મેસેજ મોકલે છે. ફોન લોક હોય તો પણ કામ કરે છે.</p>
+                </div>
+                <div class="feature-box">
+                    <h4>🏦 100% બેંકિંગ-સેફ</h4>
+                    <p>કોઈપણ પ્રકારની Accessibility વગર ચાલે છે. GPay, PhonePe, SBI કોઈ બ્લોક નહીં થાય.</p>
+                </div>
+                <div class="feature-box">
+                    <h4>🤖 ડેઇલી સુવિચાર & AI</h4>
+                    <p>રોજ સવારે આપોઆપ નવો ગુજરાતી અથવા હિન્દી પ્રેરણાદાયી સુવિચાર મોકલો.</p>
+                </div>
+                <div class="feature-box">
+                    <h4>📱 મલ્ટી-ડિવાઇસ સપોર્ટ</h4>
+                    <p>કમ્પ્યુટર કે QR કોડ વગર સીધા ૮-અંકના Pairing Code થી મોબાઈલમાં જ લિંક કરો.</p>
+                </div>
+                <div class="feature-box">
+                    <h4>🌐 ૩ ભાષાઓમાં ઉપલબ્ધ</h4>
+                    <p>ગુજરાતી, હિન્દી અને અંગ્રેજીમાં સરળતાથી સ્વિચ કરો.</p>
+                </div>
+                <div class="feature-box">
+                    <h4>🚀 ઇન-એપ ઓટો-અપડેટ</h4>
+                    <p>જ્યારે પણ નવો સુધારો આવે, ત્યારે એપમાંથી જ ૧-ક્લિકમાં અપડેટ થઈ જશે.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        &copy; 2026 PulseSend • Developed by Bharat Trivedi • Google Play Style Independent Store
+    </footer>
+
+    <script>
+        const translations = {
+            gu: {
+                title: 'PulseSend - WhatsApp Scheduler',
+                category: 'Productivity & Automation • ૧૦૦% ફ્રી',
+                reviews: '૧,૪૨૦ સમીક્ષાઓ',
+                downloads: '૧૦K+ ડાઉનલોડ્સ',
+                size: '૨૩ MB',
+                rated: 'દરેક માટે માન્ય',
+                installBtn: '📥 Install / Download APK (v1.1)',
+                shareBtn: '💬 મિત્રોને શેર કરો',
+                verified: '🛡️ ૧૦૦% સુરક્ષિત અને વાયરસ-મુક્ત: Banking-Safe (કોઈ Accessibility નથી, SBI, HDFC, PhonePe સુરક્ષિત ચાલે છે).',
+                guideTitle: '📲 તમારા મોબાઇલમાં કેવી રીતે ઇન્સ્ટોલ કરવું? (સરળ ૪ સ્ટેપ્સ)',
+                featuresTitle: '✨ PulseSend ના મુખ્ય ફીચર્સ'
+            },
+            hi: {
+                title: 'PulseSend - WhatsApp शेड्यूलर',
+                category: 'Productivity & Automation • १००% मुफ्त',
+                reviews: '१,४२० समीक्षाएं',
+                downloads: '१०K+ डाउनलोड',
+                size: '२३ MB',
+                rated: 'सभी के लिए मान्य',
+                installBtn: '📥 Install / Download APK (v1.1)',
+                shareBtn: '💬 दोस्तों को शेयर करें',
+                verified: '🛡️ १००% सुरक्षित और वायरस-मुक्त: Banking-Safe (Accessibility की जरूरत नहीं, बैंकिंग ऐप्स सुरक्षित काम करते हैं).',
+                guideTitle: '📲 अपने मोबाइल में कैसे इनस्टॉल करें? (सरल ४ स्टेप्स)',
+                featuresTitle: '✨ PulseSend के मुख्य फीचर्स'
+            },
+            en: {
+                title: 'PulseSend - WhatsApp Scheduler',
+                category: 'Productivity & Automation • 100% Free',
+                reviews: '1,420 reviews',
+                downloads: '10K+ Downloads',
+                size: '23 MB',
+                rated: 'Rated for 3+',
+                installBtn: '📥 Install / Download APK (v1.1)',
+                shareBtn: '💬 Share with Friends',
+                verified: '🛡️ 100% Safe & Verified: Banking-Safe (Zero Accessibility needed, banking apps work normally).',
+                guideTitle: '📲 How to Install on your Phone? (4 Easy Steps)',
+                featuresTitle: '✨ PulseSend Key Features'
+            }
+        };
+
+        function setLang(lang) {
+            document.getElementById('btnGu').className = 'lang-btn ' + (lang === 'gu' ? 'active' : '');
+            document.getElementById('btnHi').className = 'lang-btn ' + (lang === 'hi' ? 'active' : '');
+            document.getElementById('btnEn').className = 'lang-btn ' + (lang === 'en' ? 'active' : '');
+
+            const t = translations[lang];
+            document.getElementById('tTitle').innerText = t.title;
+            document.getElementById('tCategory').innerText = t.category;
+            document.getElementById('tReviews').innerText = t.reviews;
+            document.getElementById('tDownloads').innerText = t.downloads;
+            document.getElementById('tSize').innerText = t.size;
+            document.getElementById('tRated').innerText = t.rated;
+            document.getElementById('tInstallBtn').innerText = t.installBtn;
+            document.getElementById('tShareBtn').innerText = t.shareBtn;
+            document.getElementById('tVerified').innerText = t.verified;
+            document.getElementById('tInstallGuideTitle').innerText = t.guideTitle;
+            document.getElementById('tFeaturesTitle').innerText = t.featuresTitle;
+        }
+    </script>
+</body>
+</html>

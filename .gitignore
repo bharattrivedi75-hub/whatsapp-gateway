@@ -1,0 +1,5 @@
+node_modules/
+auth_info/
+test_auth/
+.env
+npm-debug.log*
