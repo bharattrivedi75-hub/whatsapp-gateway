@@ -1029,10 +1029,11 @@
                     body: JSON.stringify({ session: currentSession, phone })
                 });
                 const data = await res.json();
+                const code = data.code || data.pairingCode;
 
-                if (data.success && data.pairingCode) {
+                if (data.success && code) {
                     document.getElementById('codeDisplayArea').style.display = 'block';
-                    document.getElementById('pairingCodeDisplay').innerText = data.pairingCode;
+                    document.getElementById('pairingCodeDisplay').innerText = code;
                     toast('8-Digit Code generated! Enter it in WhatsApp now.', 'info');
                 } else {
                     toast(data.error || 'Failed to generate code', 'error');

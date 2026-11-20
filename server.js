@@ -288,6 +288,7 @@ app.post('/api/pairing-code', async (req, res) => {
             return res.json({
                 success: true,
                 code: formattedCode,
+                pairingCode: formattedCode,
                 rawCode: rawCode,
                 phone: cleanDigits,
                 sessionId: session.id
