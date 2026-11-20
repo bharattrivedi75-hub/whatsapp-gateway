@@ -352,209 +352,177 @@ app.get('/download/apk', (req, res) => {
     res.redirect('https://github.com/bharattrivedi75-hub/whatsapp-gateway/raw/main/PulseSend.apk');
 });
 
-// 8. Web Dashboard UI
+// ---------------------- 8. PulseSend Web & Cloud Scheduler ----------------------
+const DATA_FILE = path.join(__dirname, 'server_data.json');
+
+function loadWebData() {
+    try {
+        if (fs.existsSync(DATA_FILE)) {
+            return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+        }
+    } catch (_) {}
+    return {
+        schedules: [],
+        templates: [
+            { id: 't1', title: '🌅 Good Morning (શુભ સવાર)', body: 'શુભ સવાર! તમારો આજનો દિવસ ખૂબ જ આનંદમય અને સફળ રહે તેવી હાર્દિક શુભકામનાઓ! 🌸' },
+            { id: 't2', title: '🙏 Festival Wishes (શુભેચ્છાઓ)', body: 'તમને અને તમારા સમગ્ર પરિવારને આજના પાવન પર્વની હાર્દિક શુભેચ્છાઓ! ઈશ્વર સદાય સુખ-શાંતિ આપે. 🪔✨' },
+            { id: 't3', title: '🎂 Birthday Wishes (જન્મદિવસ)', body: 'જન્મદિવસની ખૂબ ખૂબ હાર્દિક શુભકામનાઓ! 🎂🎉 ભગવાન તમને દીર્ઘાયુ અને ઉત્તમ સ્વાસ્થ્ય પ્રદાન કરે!' },
+            { id: 't4', title: '💳 Payment Reminder (પેમેન્ટ યાદી)', body: 'નમસ્તે, આપનું બાકી પેમેન્ટ ચૂકવવા માટે વિનંતી છે. આપની અનુકૂળતા મુજબ જલ્દી ચૂકવણી કરવા નમ્ર વિનંતી. આભાર!' }
+        ],
+        logs: []
+    };
+}
+
+function saveWebData(data) {
+    try {
+        fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
+    } catch (err) {
+        console.error('Failed to save server_data.json:', err);
+    }
+}
+
+// Background Cloud Scheduler - runs every 10 seconds
+setInterval(async () => {
+    const data = loadWebData();
+    const now = new Date();
+    let hasChanges = false;
+
+    for (const schedule of data.schedules) {
+        if (schedule.status === 'PENDING' && new Date(schedule.scheduledAt) <= now) {
+            console.log(`[Cloud Scheduler] Due schedule ${schedule.id} to ${schedule.phone}`);
+            const session = sessions.get(schedule.session || 'default');
+            if (session && session.connectionState === 'CONNECTED' && session.sock) {
+                try {
+                    let cleanDigits = schedule.phone.replace(/[^0-9]/g, '');
+                    if (cleanDigits.length === 10) cleanDigits = '91' + cleanDigits;
+                    const jid = `${cleanDigits}@s.whatsapp.net`;
+                    await session.sock.sendMessage(jid, { text: schedule.message });
+                    schedule.status = 'SENT';
+                    schedule.sentAt = new Date().toISOString();
+                    data.logs.unshift({
+                        id: 'log_' + Date.now(),
+                        session: schedule.session,
+                        phone: schedule.phone,
+                        message: schedule.message,
+                        status: 'SENT',
+                        timestamp: new Date().toISOString()
+                    });
+                    hasChanges = true;
+                    console.log(`[Cloud Scheduler] Sent successfully to ${schedule.phone}`);
+                } catch (err) {
+                    console.error(`[Cloud Scheduler] Error sending ${schedule.id}:`, err);
+                    schedule.status = 'FAILED';
+                    schedule.error = err.message;
+                    data.logs.unshift({
+                        id: 'log_' + Date.now(),
+                        session: schedule.session,
+                        phone: schedule.phone,
+                        message: schedule.message,
+                        status: 'FAILED',
+                        error: err.message,
+                        timestamp: new Date().toISOString()
+                    });
+                    hasChanges = true;
+                }
+            } else {
+                console.log(`[Cloud Scheduler] Session [${schedule.session || 'default'}] not connected yet. Will retry next tick.`);
+            }
+        }
+    }
+
+    if (hasChanges) {
+        data.logs = data.logs.slice(0, 300);
+        saveWebData(data);
+    }
+}, 10000);
+
+// Web Data APIs
+app.get('/api/web/data', (req, res) => {
+    const sessionId = getSessionIdFromReq(req);
+    const data = loadWebData();
+    const filteredSchedules = data.schedules.filter(s => (s.session || 'default') === sessionId);
+    res.json({
+        schedules: filteredSchedules,
+        templates: data.templates,
+        logs: data.logs.filter(l => (l.session || 'default') === sessionId)
+    });
+});
+
+app.post('/api/web/schedule', (req, res) => {
+    try {
+        const { session, phone, message, scheduledAt } = req.body;
+        if (!phone || !message || !scheduledAt) {
+            return res.status(400).json({ success: false, error: 'Phone, message, and scheduledAt are required' });
+        }
+        const data = loadWebData();
+        const newSched = {
+            id: 'sched_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+            session: sanitizeSessionId(session || 'default'),
+            phone: phone.trim(),
+            message: message.trim(),
+            scheduledAt,
+            status: 'PENDING',
+            createdAt: new Date().toISOString()
+        };
+        data.schedules.push(newSched);
+        saveWebData(data);
+        res.json({ success: true, schedule: newSched });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.delete('/api/web/schedule/:id', (req, res) => {
+    const data = loadWebData();
+    const beforeCount = data.schedules.length;
+    data.schedules = data.schedules.filter(s => s.id !== req.params.id);
+    if (data.schedules.length !== beforeCount) {
+        saveWebData(data);
+        return res.json({ success: true, message: 'Schedule cancelled' });
+    }
+    res.status(404).json({ success: false, error: 'Schedule not found' });
+});
+
+app.post('/api/web/template', (req, res) => {
+    try {
+        const { title, body } = req.body;
+        if (!title || !body) return res.status(400).json({ success: false, error: 'Title and body required' });
+        const data = loadWebData();
+        const newTpl = {
+            id: 'tpl_' + Date.now(),
+            title: title.trim(),
+            body: body.trim()
+        };
+        data.templates.push(newTpl);
+        saveWebData(data);
+        res.json({ success: true, template: newTpl });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.delete('/api/web/template/:id', (req, res) => {
+    const data = loadWebData();
+    data.templates = data.templates.filter(t => t.id !== req.params.id);
+    saveWebData(data);
+    res.json({ success: true });
+});
+
+app.delete('/api/web/logs', (req, res) => {
+    const sessionId = getSessionIdFromReq(req);
+    const data = loadWebData();
+    data.logs = data.logs.filter(l => (l.session || 'default') !== sessionId);
+    saveWebData(data);
+    res.json({ success: true });
+});
+
+// Serve PulseSend Web Dashboard
 app.get('/', (req, res) => {
-    res.send(`
-<!DOCTYPE html>
-<html lang="gu">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PulseSend - WhatsApp Multi-Device Gateway</title>
-    <style>
-        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        body { background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .card { background: #1e293b; max-width: 520px; width: 100%; border-radius: 20px; padding: 28px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); border: 1px solid #334155; }
-        .badge { display: inline-block; padding: 6px 16px; border-radius: 20px; font-weight: 600; font-size: 14px; margin-bottom: 16px; }
-        .badge.connected { background: #14532d; color: #4ade80; border: 1px solid #22c55e; }
-        .badge.scan_qr { background: #713f12; color: #facc15; border: 1px solid #eab308; }
-        .badge.disconnected { background: #7f1d1d; color: #f87171; border: 1px solid #ef4444; }
-        .session-box { background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 12px 16px; margin-bottom: 20px; text-align: left; }
-        .session-box label { font-size: 12px; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
-        .session-box input { background: transparent; border: none; color: #38bdf8; font-size: 15px; font-weight: bold; width: 100%; outline: none; margin-top: 4px; }
-        .tab-bar { display: flex; background: #0f172a; border-radius: 10px; padding: 4px; margin-bottom: 20px; }
-        .tab-btn { flex: 1; padding: 8px 12px; border: none; background: transparent; color: #94a3b8; font-weight: 600; font-size: 14px; cursor: pointer; border-radius: 8px; }
-        .tab-btn.active { background: #2563eb; color: #fff; }
-        .pairing-card { background: #0f172a; border: 1px solid #334155; border-radius: 14px; padding: 20px; margin-bottom: 20px; text-align: center; }
-        .code-display { font-size: 32px; font-family: monospace; font-weight: 800; letter-spacing: 4px; color: #4ade80; background: #052e16; padding: 12px; border-radius: 10px; border: 2px dashed #22c55e; margin: 16px 0; user-select: all; cursor: pointer; }
-        .input-group { display: flex; gap: 8px; margin: 12px 0; }
-        .input-group input { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: #fff; font-size: 16px; outline: none; }
-        .input-group button { padding: 12px 18px; border-radius: 8px; border: none; background: #22c55e; color: #000; font-weight: bold; cursor: pointer; font-size: 15px; }
-        .qr-box { margin: 16px 0; min-height: 240px; display: flex; align-items: center; justify-content: center; }
-        .qr-box img { max-width: 220px; border-radius: 12px; border: 4px solid #334155; }
-        .guide-box { background: #0f172a; border-radius: 10px; padding: 14px; margin-top: 16px; text-align: left; font-size: 13px; color: #cbd5e1; line-height: 1.6; border: 1px solid #334155; }
-        .guide-box strong { color: #38bdf8; }
-        .btn-danger { background: #dc2626; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 12px; }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <h2 style="margin: 0 0 6px 0; color: #38bdf8;">⚡ PulseSend Gateway</h2>
-        <p style="margin: 0 0 16px 0; color: #94a3b8; font-size: 13px;">Multi-Device WhatsApp Automation (Zero Accessibility)</p>
-        
-        <div class="session-box">
-            <label>ડિવાઇસ / Session ID:</label>
-            <input type="text" id="sessionIdInput" value="default" placeholder="દા.ત. mobile_1 અથવા ફોન નંબર" onchange="switchSession()" />
-        </div>
+    res.sendFile(path.join(__dirname, 'web.html'));
+});
 
-        <div id="statusBadge" class="badge disconnected">તપાસી રહ્યું છે...</div>
-
-        <div class="tab-bar">
-            <button class="tab-btn active" id="tabPairing" onclick="showTab('pairing')">🔢 Pairing Code (કમ્પ્યુટર વગર)</button>
-            <button class="tab-btn" id="tabQR" onclick="showTab('qr')">📷 QR Code</button>
-        </div>
-
-        <!-- Section 1: Pairing Code without Desktop -->
-        <div id="pairingSection" class="pairing-card">
-            <p style="margin: 0 0 8px 0; font-size: 14px; color: #e2e8f0;"><strong>કોઈ કમ્પ્યુટર કે સ્કેનિંગની જરૂર નથી!</strong><br>સીધા તમારા જ મોબાઈલમાંથી લિંક કરો:</p>
-
-            <div class="input-group">
-                <input type="tel" id="mobileNumber" placeholder="દા.ત. 9876543210" maxlength="12" />
-                <button onclick="requestPairingCode()">કોડ મેળવો</button>
-            </div>
-
-            <div id="codeContainer" style="display: none;">
-                <div class="code-display" id="pairingCodeVal" onclick="copyCode()">----</div>
-                <p style="font-size: 12px; color: #94a3b8; margin: 4px 0 12px 0;">(કોડ કોપી કરવા ક્લિક કરો)</p>
-                <button onclick="copyCode()" style="background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer;">📋 Copy Code</button>
-            </div>
-
-            <div class="guide-box">
-                <strong>મોબાઈલમાં કેવી રીતે લિંક કરવું:</strong>
-                <ol style="margin: 6px 0 0 0; padding-left: 20px;">
-                    <li>મોબાઈલમાં <strong>WhatsApp</strong> ખોલો.</li>
-                    <li>ત્રણ ટપકાં (Settings) ➔ <strong>Linked Devices</strong> પર જાઓ.</li>
-                    <li><strong>Link a device</strong> પર ક્લિક કરો.</li>
-                    <li>નીચે <strong>"Link with phone number instead"</strong> (ફોન નંબર વડે લિંક કરો) પસંદ કરો.</li>
-                    <li>ઉપરનો <strong>૮-અક્ષરનો કોડ</strong> ત્યાં દાખલ કરો!</li>
-                </ol>
-            </div>
-        </div>
-
-        <!-- Section 2: QR Code -->
-        <div id="qrSection" style="display: none; text-align: center;">
-            <div class="qr-box" id="qrContainer">
-                <p style="color: #64748b;">કનેક્ટ થઈ રહ્યું છે...</p>
-            </div>
-        </div>
-
-        <button id="logoutBtn" class="btn-danger" style="display:none;" onclick="disconnectWA()">Disconnect WhatsApp</button>
-    </div>
-
-    <script>
-        let currentTab = 'pairing';
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('session')) {
-            document.getElementById('sessionIdInput').value = urlParams.get('session');
-        }
-
-        function getCurSession() {
-            return document.getElementById('sessionIdInput').value.trim() || 'default';
-        }
-
-        function switchSession() {
-            const sess = getCurSession();
-            const newUrl = window.location.pathname + '?session=' + encodeURIComponent(sess);
-            window.history.replaceState(null, '', newUrl);
-            checkStatus();
-        }
-
-        function showTab(tab) {
-            currentTab = tab;
-            document.getElementById('tabPairing').className = 'tab-btn ' + (tab === 'pairing' ? 'active' : '');
-            document.getElementById('tabQR').className = 'tab-btn ' + (tab === 'qr' ? 'active' : '');
-            document.getElementById('pairingSection').style.display = tab === 'pairing' ? 'block' : 'none';
-            document.getElementById('qrSection').style.display = tab === 'qr' ? 'block' : 'none';
-        }
-
-        async function requestPairingCode() {
-            const phone = document.getElementById('mobileNumber').value.trim();
-            if (!phone || phone.length < 10) {
-                alert('કૃપા કરીને સાચો ૧૦ અંકનો મોબાઈલ નંબર નાખો!');
-                return;
-            }
-
-            const codeContainer = document.getElementById('codeContainer');
-            const codeVal = document.getElementById('pairingCodeVal');
-            codeVal.innerText = 'લાવી રહ્યું છે...';
-            codeContainer.style.display = 'block';
-
-            try {
-                const res = await fetch('/api/pairing-code', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ session: getCurSession(), phone: phone })
-                });
-                const data = await res.json();
-
-                if (data.success && data.code) {
-                    codeVal.innerText = data.code;
-                } else if (data.alreadyConnected) {
-                    alert('આ સેશન પર WhatsApp પહેલેથી કનેક્ટ થયેલું છે (+ ' + data.phone + ')');
-                    checkStatus();
-                } else {
-                    alert('ભૂલ: ' + (data.error || 'કોડ મળી શક્યો નહીં'));
-                    codeContainer.style.display = 'none';
-                }
-            } catch (err) {
-                alert('સર્વર સાથે કનેક્ટ ન થઈ શક્યું: ' + err.message);
-                codeContainer.style.display = 'none';
-            }
-        }
-
-        function copyCode() {
-            const code = document.getElementById('pairingCodeVal').innerText;
-            if (code && code !== '----') {
-                navigator.clipboard.writeText(code.replace('-', ''));
-                alert('કોડ કોપી થઈ ગયો: ' + code);
-            }
-        }
-
-        async function checkStatus() {
-            try {
-                const res = await fetch('/api/status?session=' + encodeURIComponent(getCurSession()));
-                const data = await res.json();
-                const badge = document.getElementById('statusBadge');
-                const qrContainer = document.getElementById('qrContainer');
-                const logoutBtn = document.getElementById('logoutBtn');
-
-                if (data.status === 'CONNECTED') {
-                    badge.className = 'badge connected';
-                    badge.innerText = '✅ કનેક્ટ થયેલ છે: +' + data.phone;
-                    logoutBtn.style.display = 'block';
-                    if (qrContainer) qrContainer.innerHTML = '<div style="color: #4ade80; font-weight: 600;">✨ WhatsApp સક્રિય છે!</div>';
-                } else if (data.status === 'SCAN_QR' && data.qr) {
-                    badge.className = 'badge scan_qr';
-                    badge.innerText = '⏳ લિંક કરવા તૈયાર';
-                    logoutBtn.style.display = 'none';
-                    if (qrContainer) qrContainer.innerHTML = '<img src="' + data.qr + '" alt="QR Code" />';
-                } else {
-                    badge.className = 'badge disconnected';
-                    badge.innerText = '⏳ ડિસ્કનેક્ટ (' + data.status + ')';
-                    logoutBtn.style.display = 'none';
-                }
-            } catch (err) {
-                console.error(err);
-            }
-        }
-
-        async function disconnectWA() {
-            if (confirm('શું તમે આ સેશનનું WhatsApp ડિસ્કનેક્ટ કરવા માંગો છો?')) {
-                await fetch('/api/disconnect', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ session: getCurSession() })
-                });
-                checkStatus();
-            }
-        }
-
-        setInterval(checkStatus, 4000);
-        checkStatus();
-    </script>
-</body>
-</html>
-    `);
+app.get('/web', (req, res) => {
+    res.sendFile(path.join(__dirname, 'web.html'));
 });
 
 app.listen(PORT, '0.0.0.0', () => {

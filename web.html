@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PulseSend Web - WhatsApp Cloud Scheduler & Broadcast</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22%20%220%22%20width=%22100%22%20height=%22100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+    <style>
+        :root {
+            --bg-dark: #0c1317;
+            --panel-bg: #111b21;
+            --panel-header: #202c33;
+            --card-bg: #182229;
+            --card-border: #222e35;
+            --accent: #00a884;
+            --accent-hover: #06cf9c;
+            --text-main: #e9edef;
+            --text-muted: #8696a0;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background: var(--bg-dark); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; }
+
+        /* Header */
+        header {
+            background: var(--panel-header);
+            border-bottom: 1px solid var(--card-border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
+        .brand-icon {
+            width: 40px; height: 40px; border-radius: 10px;
+            background: linear-gradient(135deg, #00a884, #056162);
+            display: flex; align-items: center; justify-content: center; font-size: 22px;
+        }
+        .brand-text h1 { font-size: 18px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; }
+        .badge-web { background: #00a884; color: #000; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 6px; text-transform: uppercase; }
+        .brand-text p { font-size: 12px; color: var(--text-muted); }
+
+        .header-actions { display: flex; align-items: center; gap: 12px; }
+        .lang-select, .session-input {
+            background: var(--card-bg); color: var(--text-main); border: 1px solid var(--card-border);
+            padding: 7px 12px; border-radius: 8px; font-size: 13px; outline: none;
+        }
+        .status-badge {
+            display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px;
+            font-size: 13px; font-weight: 600; background: rgba(239, 68, 68, 0.15); color: #fca5a5;
+        }
+        .status-badge.connected { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
+        .status-badge.connecting { background: rgba(245, 158, 11, 0.15); color: #fcd34d; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+
+        /* Main Layout */
+        .app-container { display: flex; flex: 1; max-width: 1400px; width: 100%; margin: 0 auto; }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            width: 260px; background: var(--panel-bg); border-right: 1px solid var(--card-border);
+            padding: 16px 10px; display: flex; flex-direction: column; gap: 6px;
+        }
+        .nav-item {
+            display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 10px;
+            color: var(--text-muted); font-size: 14px; font-weight: 600; cursor: pointer;
+            transition: all 0.2s; user-select: none;
+        }
+        .nav-item:hover { background: rgba(255, 255, 255, 0.05); color: var(--text-main); }
+        .nav-item.active { background: var(--card-bg); color: var(--accent); border-left: 3px solid var(--accent); }
+        .nav-item .icon { font-size: 18px; width: 24px; text-align: center; }
+
+        .app-download-cta {
+            margin-top: auto; background: linear-gradient(135deg, rgba(0, 168, 132, 0.15), rgba(5, 97, 98, 0.2));
+            border: 1px dashed rgba(0, 168, 132, 0.4); border-radius: 12px; padding: 14px; text-align: center;
+        }
+        .app-download-cta p { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+        .btn-download-app {
+            display: inline-block; width: 100%; background: var(--accent); color: #111b21;
+            font-weight: 700; font-size: 12px; padding: 8px; border-radius: 8px; text-decoration: none;
+        }
+
+        /* Content Area */
+        .main-content { flex: 1; padding: 24px 30px; overflow-y: auto; max-width: 1100px; }
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; animation: fadeIn 0.2s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+        .section-title { font-size: 22px; font-weight: 700; margin-bottom: 6px; color: #fff; }
+        .section-desc { font-size: 14px; color: var(--text-muted); margin-bottom: 20px; }
+
+        /* Cards */
+        .card {
+            background: var(--panel-bg); border: 1px solid var(--card-border);
+            border-radius: 14px; padding: 20px; margin-bottom: 20px;
+        }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .card-title { font-size: 16px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; }
+
+        /* Forms & Inputs */
+        .form-group { margin-bottom: 16px; }
+        .form-label { display: block; font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+        .input-text, .textarea, .select {
+            width: 100%; background: var(--card-bg); color: var(--text-main);
+            border: 1px solid var(--card-border); border-radius: 10px; padding: 12px 14px;
+            font-size: 14px; outline: none; transition: border-color 0.2s;
+        }
+        .input-text:focus, .textarea:focus, .select:focus { border-color: var(--accent); }
+        .textarea { resize: vertical; min-height: 100px; line-height: 1.5; }
+        .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 5px; }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            background: var(--accent); color: #111b21; font-weight: 700; font-size: 14px;
+            padding: 10px 20px; border-radius: 10px; border: none; cursor: pointer; transition: all 0.2s;
+        }
+        .btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
+        .btn:active { transform: translateY(0); }
+        .btn-outline { background: transparent; color: var(--text-main); border: 1px solid var(--card-border); }
+        .btn-outline:hover { background: rgba(255, 255, 255, 0.05); border-color: var(--text-muted); }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px; }
+
+        /* Emojis bar */
+        .emoji-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+        .emoji-btn {
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 6px; padding: 4px 8px; font-size: 16px; cursor: pointer; transition: 0.15s;
+        }
+        .emoji-btn:hover { background: var(--panel-header); border-color: var(--accent); transform: scale(1.15); }
+
+        /* Link Device Grid */
+        .link-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .qr-box {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 24px; background: #fff; border-radius: 12px; width: fit-content; margin: 0 auto 16px;
+        }
+        .qr-box img { width: 220px; height: 220px; object-fit: contain; }
+        .code-display {
+            font-size: 32px; font-weight: 800; letter-spacing: 4px; color: var(--accent);
+            background: var(--card-bg); padding: 16px 24px; border-radius: 12px; text-align: center;
+            border: 2px dashed var(--accent); margin: 16px 0; user-select: all;
+        }
+
+        /* Tables & Lists */
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+        th { background: var(--card-bg); color: var(--text-muted); padding: 12px 14px; font-weight: 600; border-bottom: 1px solid var(--card-border); }
+        td { padding: 12px 14px; border-bottom: 1px solid var(--card-border); vertical-align: middle; }
+        tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+        /* Templates Grid */
+        .templates-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+        .template-card {
+            background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px;
+            padding: 16px; display: flex; flex-direction: column; justify-content: space-between;
+        }
+        .template-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+        .template-body { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px; flex: 1; }
+        .template-actions { display: flex; gap: 8px; }
+
+        /* Toast Notifications */
+        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; }
+        .toast {
+            background: var(--panel-header); border: 1px solid var(--accent); color: #fff;
+            padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 600;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5); animation: toastIn 0.3s ease;
+        }
+        @keyframes toastIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        @media (max-width: 900px) {
+            .app-container { flex-direction: column; }
+            .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--card-border); flex-direction: row; overflow-x: auto; padding: 10px; }
+            .nav-item { padding: 8px 12px; font-size: 13px; white-space: nowrap; border-left: none; border-bottom: 2px solid transparent; }
+            .nav-item.active { border-left: none; border-bottom: 2px solid var(--accent); }
+            .app-download-cta { display: none; }
+            .link-grid { grid-template-columns: 1fr; }
+            .main-content { padding: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <a href="/" class="brand">
+            <div class="brand-icon">⚡</div>
+            <div class="brand-text">
+                <h1>PulseSend <span class="badge-web">Web</span></h1>
+                <p id="t-subtitle">WhatsApp Cloud Scheduler & Broadcast</p>
+            </div>
+        </a>
+
+        <div class="header-actions">
+            <!-- Language Selector -->
+            <select class="lang-select" id="langSelector" onchange="switchLanguage(this.value)">
+                <option value="gu" selected>ગુજરાતી</option>
+                <option value="hi">हिन्दी</option>
+                <option value="en">English</option>
+            </select>
+
+            <!-- Device Session Input -->
+            <input type="text" class="session-input" id="sessionIdInput" value="default" title="Device Session ID" placeholder="Session ID" onchange="changeSession(this.value)">
+
+            <!-- Connection Status -->
+            <div class="status-badge" id="statusBadge">
+                <span class="status-dot"></span>
+                <span id="statusText">Checking...</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- App Body -->
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="nav-item active" onclick="showTab('link')">
+                <span class="icon">📱</span>
+                <span class="nav-label" id="nav-link">WhatsApp Link</span>
+            </div>
+            <div class="nav-item" onclick="showTab('quick')">
+                <span class="icon">⚡</span>
+                <span class="nav-label" id="nav-quick">Quick Send</span>
+            </div>
+            <div class="nav-item" onclick="showTab('schedules')">
+                <span class="icon">⏰</span>
+                <span class="nav-label" id="nav-schedules">Schedules</span>
+            </div>
+            <div class="nav-item" onclick="showTab('templates')">
+                <span class="icon">📋</span>
+                <span class="nav-label" id="nav-templates">Templates</span>
+            </div>
+            <div class="nav-item" onclick="showTab('broadcast')">
+                <span class="icon">👥</span>
+                <span class="nav-label" id="nav-broadcast">Bulk Broadcast</span>
+            </div>
+            <div class="nav-item" onclick="showTab('logs')">
+                <span class="icon">📜</span>
+                <span class="nav-label" id="nav-logs">Delivery Logs</span>
+            </div>
+
+            <div class="app-download-cta">
+                <p id="t-mobile-promo">Use on Android Phone</p>
+                <a href="/download" class="btn-download-app" id="btn-get-apk">📥 Download Android APK</a>
+            </div>
+        </nav>
+
+        <!-- Main Content View -->
+        <main class="main-content">
+
+            <!-- TAB 1: WhatsApp Device Link -->
+            <section id="tab-link" class="tab-pane active">
+                <h2 class="section-title" id="t-link-title">Link WhatsApp Device</h2>
+                <p class="section-desc" id="t-link-desc">Connect your WhatsApp account using an 8-digit Pairing Code or QR Code.</p>
+
+                <div class="card" id="connectedCard" style="display: none;">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <span style="color: var(--success); font-size: 20px;">✅</span>
+                            <span id="t-connected-heading">WhatsApp is Connected</span>
+                        </div>
+                        <button class="btn btn-danger btn-sm" onclick="disconnectWhatsApp()" id="btn-disconnect">Disconnect / Logout</button>
+                    </div>
+                    <p style="color: var(--text-muted); font-size: 14px;" id="connectedDetails">Active Phone: +91...</p>
+                </div>
+
+                <div class="link-grid" id="linkGrid">
+                    <!-- Option A: 8-Digit Pairing Code (Phone to Phone) -->
+                    <div class="card">
+                        <div class="card-title" style="margin-bottom: 12px;">
+                            <span>🔢</span> <span id="t-pair-title">8-Digit Pairing Code (Recommended)</span>
+                        </div>
+                        <p class="form-hint" style="margin-bottom: 16px;" id="t-pair-hint">
+                            Link without scanning QR! Enter your 10-digit WhatsApp number to receive an 8-digit code.
+                        </p>
+
+                        <div class="form-group">
+                            <label class="form-label" id="t-phone-label">Your WhatsApp Phone Number</label>
+                            <input type="tel" class="input-text" id="pairPhoneInput" placeholder="e.g. 9876543210" maxlength="15">
+                        </div>
+
+                        <button class="btn" style="width: 100%;" onclick="requestPairingCode()" id="btn-get-code">
+                            Get 8-Digit Code ➔
+                        </button>
+
+                        <div id="codeDisplayArea" style="display: none;">
+                            <div class="code-display" id="pairingCodeDisplay">---- ----</div>
+                            <div style="background: rgba(0, 168, 132, 0.1); padding: 12px; border-radius: 8px; font-size: 13px; color: var(--text-main);" id="t-pair-steps">
+                                <strong>How to enter in WhatsApp:</strong><br>
+                                1. Open WhatsApp on your phone.<br>
+                                2. Tap <strong>Three Dots (⁝) ➔ Linked Devices</strong>.<br>
+                                3. Tap <strong>Link a Device ➔ "Link with phone number instead"</strong>.<br>
+                                4. Enter the 8-digit code shown above!
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Option B: QR Code -->
+                    <div class="card" style="text-align: center;">
+                        <div class="card-title" style="margin-bottom: 12px; justify-content: center;">
+                            <span>📷</span> <span id="t-qr-title">Scan QR Code</span>
+                        </div>
+                        <p class="form-hint" style="margin-bottom: 16px;" id="t-qr-hint">
+                            Scan with your phone's camera in WhatsApp Linked Devices.
+                        </p>
+
+                        <div class="qr-box">
+                            <img id="qrImage" src="" alt="Scan QR Code" style="display: none;">
+                            <div id="qrPlaceholder" style="color: #666; font-size: 13px; padding: 60px 0;">
+                                Loading QR Code...
+                            </div>
+                        </div>
+                        <button class="btn btn-outline btn-sm" onclick="fetchStatus()" id="btn-refresh-qr">🔄 Refresh QR Code</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: Quick Send -->
+            <section id="tab-quick" class="tab-pane">
+                <h2 class="section-title" id="t-quick-title">Quick WhatsApp Send</h2>
+                <p class="section-desc" id="t-quick-desc">Send instant WhatsApp messages directly from this browser.</p>
+
+                <div class="card" style="max-width: 650px;">
+                    <div class="form-group">
+                        <label class="form-label" id="t-recipients-label">Recipient Phone Number(s)</label>
+                        <input type="text" class="input-text" id="quickPhone" placeholder="e.g. 9876543210 (or separate multiple with comma)">
+                        <span class="form-hint" id="t-recipients-hint">Separate multiple numbers with commas. 10-digit Indian numbers auto-prefix +91.</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" id="t-message-label">Message Content</label>
+                        <div class="emoji-bar">
+                            <button type="button" class="emoji-btn" onclick="addEmoji('🙏')">🙏</button>
+                            <button type="button" class="emoji-btn" onclick="addEmoji('🌅')">🌅</button>
+                            <button type="button" class="emoji-btn" onclick="addEmoji('🎂')">🎂</button>
+                            <button type="button" class="emoji-btn" onclick="addEmoji('💳')">💳</button>
+                            <button type="button" class="emoji-btn" onclick="addEmoji('✅')">✅</button>
+                            <button type="button" class="emoji-btn" onclick="addEmoji('👍')">👍</button>
+                            <button type="button" class="emoji-btn" onclick="addEmoji('🎉')">🎉</button>
+                            <button type="button" class="emoji-btn" onclick="addEmoji('💐')">💐</button>
+                        </div>
+                        <textarea class="textarea" id="quickMessage" placeholder="Type your WhatsApp message here..."></textarea>
+                    </div>
+
+                    <button class="btn" onclick="sendQuickMessage()" id="btn-send-now">
+                        🚀 Send Message Now
+                    </button>
+                </div>
+            </section>
+
+            <!-- TAB 3: Schedules -->
+            <section id="tab-schedules" class="tab-pane">
+                <div class="card-header" style="margin-bottom: 8px;">
+                    <div>
+                        <h2 class="section-title" id="t-sched-title">Cloud Message Schedules</h2>
+                        <p class="section-desc" id="t-sched-desc">Messages fire automatically from the cloud at the exact scheduled date and time.</p>
+                    </div>
+                </div>
+
+                <!-- Add Schedule Card -->
+                <div class="card">
+                    <div class="card-title" style="margin-bottom: 14px;">
+                        <span>➕</span> <span id="t-new-sched-title">Create New Schedule</span>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div class="form-group">
+                            <label class="form-label" id="t-sched-recipients">Recipients (comma separated)</label>
+                            <input type="text" class="input-text" id="schedPhone" placeholder="e.g. 9876543210, 9123456780">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" id="t-sched-time">Scheduled Date & Time</label>
+                            <input type="datetime-local" class="input-text" id="schedTime">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" id="t-sched-msg">Message Content</label>
+                        <textarea class="textarea" id="schedMessage" placeholder="Type scheduled message..."></textarea>
+                    </div>
+
+                    <button class="btn" onclick="createSchedule()" id="btn-save-sched">
+                        ⏰ Schedule WhatsApp Message
+                    </button>
+                </div>
+
+                <!-- Active Schedules List -->
+                <div class="card">
+                    <div class="card-title" style="margin-bottom: 14px;">
+                        <span>📋</span> <span id="t-active-scheds">Active Schedules Queue</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th id="th-sched-time">Due Time</th>
+                                    <th id="th-sched-phone">Recipients</th>
+                                    <th id="th-sched-msg">Message</th>
+                                    <th id="th-sched-status">Status</th>
+                                    <th id="th-sched-action">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="schedulesTableBody">
+                                <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 30px;">Loading schedules...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: Templates -->
+            <section id="tab-templates" class="tab-pane">
+                <div class="card-header">
+                    <div>
+                        <h2 class="section-title" id="t-tpl-title">Message Templates</h2>
+                        <p class="section-desc" id="t-tpl-desc">Pre-saved messages for quick sending or scheduling.</p>
+                    </div>
+                    <button class="btn btn-sm" onclick="showNewTemplatePrompt()" id="btn-new-tpl">➕ Add Template</button>
+                </div>
+
+                <div class="templates-grid" id="templatesGrid">
+                    <!-- Populated via JS -->
+                </div>
+            </section>
+
+            <!-- TAB 5: Bulk Broadcast -->
+            <section id="tab-broadcast" class="tab-pane">
+                <h2 class="section-title" id="t-bulk-title">Bulk WhatsApp Broadcast</h2>
+                <p class="section-desc" id="t-bulk-desc">Send automated messages to a list of numbers with built-in anti-ban delay.</p>
+
+                <div class="card" style="max-width: 700px;">
+                    <div class="form-group">
+                        <label class="form-label" id="t-bulk-numbers-label">Phone Numbers List (One per line or comma separated)</label>
+                        <textarea class="textarea" id="bulkNumbers" style="min-height: 120px;" placeholder="9876543210&#10;9123456789&#10;9898989898"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" id="t-bulk-delay-label">Delay between messages (Seconds)</label>
+                        <input type="number" class="input-text" id="bulkDelay" value="4" min="2" max="30">
+                        <span class="form-hint" id="t-bulk-delay-hint">Recommended: 3 to 5 seconds to prevent WhatsApp account restriction.</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" id="t-bulk-msg-label">Broadcast Message</label>
+                        <textarea class="textarea" id="bulkMessage" placeholder="Type your broadcast message..."></textarea>
+                    </div>
+
+                    <button class="btn" onclick="startBroadcast()" id="btn-start-broadcast">
+                        📢 Start Bulk Broadcast
+                    </button>
+
+                    <div id="broadcastProgress" style="display: none; margin-top: 16px; background: var(--card-bg); padding: 14px; border-radius: 10px;">
+                        <p style="font-size: 13px; font-weight: 600;" id="broadcastStatusText">Sending: 0 / 0</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 6: Delivery Logs -->
+            <section id="tab-logs" class="tab-pane">
+                <div class="card-header">
+                    <div>
+                        <h2 class="section-title" id="t-logs-title">Delivery Logs & History</h2>
+                        <p class="section-desc" id="t-logs-desc">Live record of all messages sent through this server.</p>
+                    </div>
+                    <button class="btn btn-outline btn-sm" onclick="clearLogs()" id="btn-clear-logs">🗑️ Clear Logs</button>
+                </div>
+
+                <div class="card">
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th id="th-log-time">Time</th>
+                                    <th id="th-log-phone">Recipient</th>
+                                    <th id="th-log-msg">Message</th>
+                                    <th id="th-log-status">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logsTableBody">
+                                <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 30px;">No logs yet.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toast-container"></div>
+
+    <script>
+        let currentLang = 'gu';
+        let currentSession = 'default';
+        let statusPollInterval = null;
+
+        const translations = {
+            gu: {
+                subtitle: 'WhatsApp ક્લાઉડ શિડ્યુલર & બ્રોડકાસ્ટ',
+                navLink: '📱 WhatsApp લિંક',
+                navQuick: '⚡ ઇન્સ્ટન્ટ સેન્ડ',
+                navSchedules: '⏰ શિડ્યુલ્સ',
+                navTemplates: '📋 ટેમ્પલેટ્સ',
+                navBroadcast: '👥 બલ્ક બ્રોડકાસ્ટ',
+                navLogs: '📜 સેન્ડ લૉગ્સ',
+                mobilePromo: 'તમારા એન્ડ્રોઇડ ફોનમાં વાપરો',
+                btnGetApk: '📥 Android APK ડાઉનલોડ',
+                linkTitle: 'WhatsApp ડિવાઇસ લિંક કરો',
+                linkDesc: 'તમારા WhatsApp ખાતાને ૮-અક્ષરના પેરિંગ કોડ અથવા QR કોડ વડે જોડો.',
+                connectedHeading: 'WhatsApp કનેક્ટેડ છે (સક્રિય)',
+                btnDisconnect: 'ડિસ્કનેક્ટ / લૉગઆઉટ',
+                pairTitle: '૮-અક્ષરનો કોડ (સૌથી સરળ)',
+                pairHint: 'QR કોડ સ્કેન કર્યા વગર સીધા તમારા WhatsApp નંબર પર ૮-અક્ષરનો કોડ મેળવો.',
+                phoneLabel: 'તમારો ૧૦ આંકડાનો WhatsApp નંબર',
+                btnGetCode: '૮-અક્ષરનો કોડ મેળવો ➔',
+                qrTitle: 'QR કોડ સ્કેન કરો',
+                qrHint: 'તમારા ફોનના WhatsApp માં Linked Devices ખોલીને આ QR સ્કેન કરો.',
+                btnRefreshQr: '🔄 QR કોડ રિફ્રેશ કરો',
+                quickTitle: 'ઇન્સ્ટન્ટ WhatsApp મેસેજ',
+                quickDesc: 'કોઈપણ નંબર પર અહીંથી સીધો જ મેસેજ મોકલો.',
+                recipientsLabel: 'મેસેજ મેળવનારનો WhatsApp નંબર',
+                recipientsHint: 'એક કરતા વધુ નંબર માટે અલ્પવિરામ (,) વાપરો. ૧૦ આંકડાના નંબરમાં +91 આપમેળે લાગી જશે.',
+                msgLabel: 'મેસેજ લખાણ',
+                btnSendNow: '🚀 અત્યારે જ મોકલો',
+                schedTitle: 'ક્લાઉડ મેસેજ શિડ્યુલર',
+                schedDesc: 'નક્કી કરેલી તારીખ અને સમયે કમ્પ્યુટર બંધ હશે તો પણ સર્વર આપમેળે મેસેજ મોકલી દેશે.',
+                newSchedTitle: 'નવું શિડ્યુલ બનાવો',
+                schedRecipients: 'નંબર્સ (અલ્પવિરામથી અલગ)',
+                schedTime: 'મોકલવાની તારીખ અને સમય',
+                schedMsg: 'મેસેજ લખાણ',
+                btnSaveSched: '⏰ WhatsApp મેસેજ શિડ્યુલ કરો',
+                activeScheds: 'સક્રિય શિડ્યુલ્સની યાદી',
+                tplTitle: 'મેસેજ ટેમ્પલેટ્સ',
+                tplDesc: 'વારંવાર મોકલવાના મેસેજ અહીં સેવ રાખો.',
+                btnNewTpl: '➕ નવું ટેમ્પલેટ',
+                bulkTitle: 'બલ્ક WhatsApp બ્રોડકાસ્ટ',
+                bulkDesc: 'સેંકડો નંબરો પર એક સાથે સુરક્ષિત રીતે મેસેજ મોકલો.',
+                bulkNumbersLabel: 'ફોન નંબરોની યાદી (દર લાઈનમાં એક નંબર)',
+                bulkDelayLabel: 'બે મેસેજ વચ્ચેનો વિલંબ (સેકન્ડ્સ)',
+                bulkDelayHint: 'ભલામણ: એકાઉન્ટ સુરક્ષા માટે ૩ થી ૫ સેકન્ડ રાખો.',
+                bulkMsgLabel: 'બ્રોડકાસ્ટ મેસેજ',
+                btnStartBroadcast: '📢 બ્રોડકાસ્ટ શરૂ કરો',
+                logsTitle: 'ડિલિવરી લૉગ્સ & હિસ્ટ્રી',
+                logsDesc: 'આ સર્વર પરથી ગયેલા તમામ મેસેજનો રેકોર્ડ.',
+                btnClearLogs: '🗑️ લૉગ્સ સાફ કરો',
+                thTime: 'સમય',
+                thPhone: 'નંબર',
+                thMsg: 'મેસેજ',
+                thStatus: 'સ્ટેટસ',
+                thAction: 'ક્રિયા'
+            },
+            hi: {
+                subtitle: 'WhatsApp क्लाउड शेड्यूलर और ब्रॉडकास्ट',
+                navLink: '📱 WhatsApp लिंक',
+                navQuick: '⚡ इंस्टेंट सेंड',
+                navSchedules: '⏰ शेड्यूल्स',
+                navTemplates: '📋 टेम्पलेट्स',
+                navBroadcast: '👥 बल्क ब्रॉडकास्ट',
+                navLogs: '📜 डिलीवरी लॉग्स',
+                mobilePromo: 'अपने एंड्रॉइड फोन में उपयोग करें',
+                btnGetApk: '📥 Android APK डाउनलोड',
+                linkTitle: 'WhatsApp डिवाइस लिंक करें',
+                linkDesc: 'अपने WhatsApp अकाउंट को 8-अक्षर के कोड या QR कोड से कनेक्ट करें।',
+                connectedHeading: 'WhatsApp कनेक्टेड है (सक्रिय)',
+                btnDisconnect: 'डिस्कनेक्ट / लॉगआउट',
+                pairTitle: '8-अक्षर का पेयरिंग कोड (आसान)',
+                pairHint: 'बिना QR स्कैन किए अपने WhatsApp नंबर पर 8-अक्षर का कोड प्राप्त करें।',
+                phoneLabel: 'आपका 10 अंकों का WhatsApp नंबर',
+                btnGetCode: '8-अक्षर का कोड प्राप्त करें ➔',
+                qrTitle: 'QR कोड स्कैन करें',
+                qrHint: 'अपने फोन में WhatsApp Linked Devices से इस QR को स्कैन करें।',
+                btnRefreshQr: '🔄 QR कोड रिफ्रेश करें',
+                quickTitle: 'इंस्टेंट WhatsApp मैसेज',
+                quickDesc: 'किसी भी नंबर पर सीधे ब्राउज़र से तुरंत मैसेज भेजें।',
+                recipientsLabel: 'प्राप्तकर्ता का WhatsApp नंबर',
+                recipientsHint: 'एक से अधिक नंबरों के लिए कॉमा (,) लगाएं। +91 अपने आप लग जाएगा।',
+                msgLabel: 'संदेश सामग्री',
+                btnSendNow: '🚀 तुरंत भेजें',
+                schedTitle: 'क्लाउड मैसेज शेड्यूलर',
+                schedDesc: 'कंप्यूटर बंद होने पर भी निर्धारित समय पर सर्वर अपने आप मैसेज भेज देगा।',
+                newSchedTitle: 'नया शेड्यूल बनाएं',
+                schedRecipients: 'नंबर (कॉमा द्वारा अलग)',
+                schedTime: 'भेजने की तारीख और समय',
+                schedMsg: 'संदेश सामग्री',
+                btnSaveSched: '⏰ WhatsApp मैसेज शेड्यूल करें',
+                activeScheds: 'सक्रिय शेड्यूल की सूची',
+                tplTitle: 'मैसेज टेम्पलेट्स',
+                tplDesc: 'बार-बार भेजे जाने वाले संदेश यहां सेव रखें।',
+                btnNewTpl: '➕ नया टेम्पलेट',
+                bulkTitle: 'बल्क WhatsApp ब्रॉडकास्ट',
+                bulkDesc: 'कई नंबरों पर एक साथ सुरक्षित तरीके से मैसेज भेजें।',
+                bulkNumbersLabel: 'फोन नंबरों की सूची (प्रति पंक्ति एक)',
+                bulkDelayLabel: 'मैसेज के बीच का अंतराल (सेकंड)',
+                bulkDelayHint: 'सुझाव: खाते की सुरक्षा के लिए 3 से 5 सेकंड रखें।',
+                bulkMsgLabel: 'ब्रॉडकास्ट मैसेज',
+                btnStartBroadcast: '📢 ब्रॉडकास्ट शुरू करें',
+                logsTitle: 'डिलीवरी लॉग्स और इतिहास',
+                logsDesc: 'इस सर्वर से भेजे गए सभी संदेशों का लाइव रिकॉर्ड।',
+                btnClearLogs: '🗑️ लॉग्स साफ़ करें',
+                thTime: 'समय',
+                thPhone: 'नंबर',
+                thMsg: 'संदेश',
+                thStatus: 'स्थिति',
+                thAction: 'क्रिया'
+            },
+            en: {
+                subtitle: 'WhatsApp Cloud Scheduler & Broadcast',
+                navLink: '📱 WhatsApp Link',
+                navQuick: '⚡ Quick Send',
+                navSchedules: '⏰ Schedules',
+                navTemplates: '📋 Templates',
+                navBroadcast: '👥 Bulk Broadcast',
+                navLogs: '📜 Delivery Logs',
+                mobilePromo: 'Use on Android Phone',
+                btnGetApk: '📥 Download Android APK',
+                linkTitle: 'Link WhatsApp Device',
+                linkDesc: 'Connect your WhatsApp account using an 8-digit Pairing Code or QR Code.',
+                connectedHeading: 'WhatsApp Connected (Active)',
+                btnDisconnect: 'Disconnect / Logout',
+                pairTitle: '8-Digit Pairing Code (Recommended)',
+                pairHint: 'Link without scanning QR! Enter your 10-digit phone number to receive an 8-digit code.',
+                phoneLabel: 'Your WhatsApp Phone Number',
+                btnGetCode: 'Get 8-Digit Code ➔',
+                qrTitle: 'Scan QR Code',
+                qrHint: 'Open WhatsApp Linked Devices on your phone and scan this QR code.',
+                btnRefreshQr: '🔄 Refresh QR Code',
+                quickTitle: 'Quick WhatsApp Send',
+                quickDesc: 'Send instant WhatsApp messages directly from this browser.',
+                recipientsLabel: 'Recipient Phone Number(s)',
+                recipientsHint: 'Separate multiple numbers with commas. 10-digit numbers auto-prefix with +91.',
+                msgLabel: 'Message Content',
+                btnSendNow: '🚀 Send Message Now',
+                schedTitle: 'Cloud Message Schedules',
+                schedDesc: 'Messages fire automatically from the cloud at the exact scheduled date and time.',
+                newSchedTitle: 'Create New Schedule',
+                schedRecipients: 'Recipients (comma separated)',
+                schedTime: 'Scheduled Date & Time',
+                schedMsg: 'Message Content',
+                btnSaveSched: '⏰ Schedule WhatsApp Message',
+                activeScheds: 'Active Schedules Queue',
+                tplTitle: 'Message Templates',
+                tplDesc: 'Pre-saved messages for quick sending or scheduling.',
+                btnNewTpl: '➕ Add Template',
+                bulkTitle: 'Bulk WhatsApp Broadcast',
+                bulkDesc: 'Send automated messages to a list of numbers with built-in anti-ban delay.',
+                bulkNumbersLabel: 'Phone Numbers List (One per line)',
+                bulkDelayLabel: 'Delay between messages (Seconds)',
+                bulkDelayHint: 'Recommended: 3 to 5 seconds to prevent WhatsApp account restriction.',
+                bulkMsgLabel: 'Broadcast Message',
+                btnStartBroadcast: '📢 Start Bulk Broadcast',
+                logsTitle: 'Delivery Logs & History',
+                logsDesc: 'Live record of all messages sent through this server.',
+                btnClearLogs: '🗑️ Clear Logs',
+                thTime: 'Time',
+                thPhone: 'Recipient',
+                thMsg: 'Message',
+                thStatus: 'Status',
+                thAction: 'Action'
+            }
+        };
+
+        function switchLanguage(lang) {
+            currentLang = lang;
+            const t = translations[lang] || translations.gu;
+
+            document.getElementById('t-subtitle').innerText = t.subtitle;
+            document.getElementById('nav-link').innerText = t.navLink;
+            document.getElementById('nav-quick').innerText = t.navQuick;
+            document.getElementById('nav-schedules').innerText = t.navSchedules;
+            document.getElementById('nav-templates').innerText = t.navTemplates;
+            document.getElementById('nav-broadcast').innerText = t.navBroadcast;
+            document.getElementById('nav-logs').innerText = t.navLogs;
+            document.getElementById('t-mobile-promo').innerText = t.mobilePromo;
+            document.getElementById('btn-get-apk').innerText = t.btnGetApk;
+            document.getElementById('t-link-title').innerText = t.linkTitle;
+            document.getElementById('t-link-desc').innerText = t.linkDesc;
+            document.getElementById('t-connected-heading').innerText = t.connectedHeading;
+            document.getElementById('btn-disconnect').innerText = t.btnDisconnect;
+            document.getElementById('t-pair-title').innerText = t.pairTitle;
+            document.getElementById('t-pair-hint').innerText = t.pairHint;
+            document.getElementById('t-phone-label').innerText = t.phoneLabel;
+            document.getElementById('btn-get-code').innerText = t.btnGetCode;
+            document.getElementById('t-qr-title').innerText = t.qrTitle;
+            document.getElementById('t-qr-hint').innerText = t.qrHint;
+            document.getElementById('btn-refresh-qr').innerText = t.btnRefreshQr;
+
+            document.getElementById('t-quick-title').innerText = t.quickTitle;
+            document.getElementById('t-quick-desc').innerText = t.quickDesc;
+            document.getElementById('t-recipients-label').innerText = t.recipientsLabel;
+            document.getElementById('t-recipients-hint').innerText = t.recipientsHint;
+            document.getElementById('t-message-label').innerText = t.msgLabel;
+            document.getElementById('btn-send-now').innerText = t.btnSendNow;
+
+            document.getElementById('t-sched-title').innerText = t.schedTitle;
+            document.getElementById('t-sched-desc').innerText = t.schedDesc;
+            document.getElementById('t-new-sched-title').innerText = t.newSchedTitle;
+            document.getElementById('t-sched-recipients').innerText = t.schedRecipients;
+            document.getElementById('t-sched-time').innerText = t.schedTime;
+            document.getElementById('t-sched-msg').innerText = t.schedMsg;
+            document.getElementById('btn-save-sched').innerText = t.btnSaveSched;
+            document.getElementById('t-active-scheds').innerText = t.activeScheds;
+
+            document.getElementById('t-tpl-title').innerText = t.tplTitle;
+            document.getElementById('t-tpl-desc').innerText = t.tplDesc;
+            document.getElementById('btn-new-tpl').innerText = t.btnNewTpl;
+
+            document.getElementById('t-bulk-title').innerText = t.bulkTitle;
+            document.getElementById('t-bulk-desc').innerText = t.bulkDesc;
+            document.getElementById('t-bulk-numbers-label').innerText = t.bulkNumbersLabel;
+            document.getElementById('t-bulk-delay-label').innerText = t.bulkDelayLabel;
+            document.getElementById('t-bulk-delay-hint').innerText = t.bulkDelayHint;
+            document.getElementById('t-bulk-msg-label').innerText = t.bulkMsgLabel;
+            document.getElementById('btn-start-broadcast').innerText = t.btnStartBroadcast;
+
+            document.getElementById('t-logs-title').innerText = t.logsTitle;
+            document.getElementById('t-logs-desc').innerText = t.logsDesc;
+            document.getElementById('btn-clear-logs').innerText = t.btnClearLogs;
+
+            document.getElementById('th-sched-time').innerText = t.thTime;
+            document.getElementById('th-sched-phone').innerText = t.thPhone;
+            document.getElementById('th-sched-msg').innerText = t.thMsg;
+            document.getElementById('th-sched-status').innerText = t.thStatus;
+            document.getElementById('th-sched-action').innerText = t.thAction;
+
+            document.getElementById('th-log-time').innerText = t.thTime;
+            document.getElementById('th-log-phone').innerText = t.thPhone;
+            document.getElementById('th-log-msg').innerText = t.thMsg;
+            document.getElementById('th-log-status').innerText = t.thStatus;
+        }
+
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+
+            if (tabId === 'schedules' || tabId === 'templates' || tabId === 'logs') {
+                loadWebData();
+            }
+        }
+
+        function toast(msg, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const el = document.createElement('div');
+            el.className = 'toast';
+            if (type === 'error') el.style.borderColor = 'var(--danger)';
+            el.innerText = msg;
+            container.appendChild(el);
+            setTimeout(() => el.remove(), 4000);
+        }
+
+        function addEmoji(emoji) {
+            const textarea = document.getElementById('quickMessage');
+            textarea.value += emoji;
+            textarea.focus();
+        }
+
+        function changeSession(newId) {
+            currentSession = newId.trim() || 'default';
+            toast(`Switched to session: ${currentSession}`);
+            fetchStatus();
+            loadWebData();
+        }
+
+        // 1. Live WhatsApp Status
+        async function fetchStatus() {
+            try {
+                const res = await fetch(`/api/status?session=${encodeURIComponent(currentSession)}`);
+                const data = await res.json();
+
+                const badge = document.getElementById('statusBadge');
+                const text = document.getElementById('statusText');
+                const connectedCard = document.getElementById('connectedCard');
+                const linkGrid = document.getElementById('linkGrid');
+                const qrImage = document.getElementById('qrImage');
+                const qrPlaceholder = document.getElementById('qrPlaceholder');
+
+                if (data.connected) {
+                    badge.className = 'status-badge connected';
+                    text.innerText = `Connected: +${data.phone}`;
+                    connectedCard.style.display = 'block';
+                    document.getElementById('connectedDetails').innerText = `Active Phone: +${data.phone} | Session: ${data.sessionId}`;
+                    linkGrid.style.display = 'none';
+                } else if (data.status === 'CONNECTING') {
+                    badge.className = 'status-badge connecting';
+                    text.innerText = 'Connecting...';
+                    connectedCard.style.display = 'none';
+                    linkGrid.style.display = 'grid';
+                } else {
+                    badge.className = 'status-badge';
+                    text.innerText = 'Disconnected';
+                    connectedCard.style.display = 'none';
+                    linkGrid.style.display = 'grid';
+
+                    if (data.qr) {
+                        qrImage.src = data.qr;
+                        qrImage.style.display = 'block';
+                        qrPlaceholder.style.display = 'none';
+                    } else {
+                        qrImage.style.display = 'none';
+                        qrPlaceholder.style.display = 'block';
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // 2. Request 8-Digit Pairing Code
+        async function requestPairingCode() {
+            const phone = document.getElementById('pairPhoneInput').value.trim();
+            if (!phone) {
+                toast('Please enter your WhatsApp phone number', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('btn-get-code');
+            btn.disabled = true;
+            btn.innerText = 'Generating Code...';
+
+            try {
+                const res = await fetch('/api/pairing-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session: currentSession, phone })
+                });
+                const data = await res.json();
+
+                if (data.success && data.pairingCode) {
+                    document.getElementById('codeDisplayArea').style.display = 'block';
+                    document.getElementById('pairingCodeDisplay').innerText = data.pairingCode;
+                    toast('8-Digit Code generated! Enter it in WhatsApp now.', 'info');
+                } else {
+                    toast(data.error || 'Failed to generate code', 'error');
+                }
+            } catch (err) {
+                toast('Network error: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Get 8-Digit Code ➔';
+            }
+        }
+
+        // 3. Disconnect WhatsApp
+        async function disconnectWhatsApp() {
+            if (!confirm('Are you sure you want to disconnect WhatsApp?')) return;
+            try {
+                const res = await fetch('/api/disconnect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session: currentSession })
+                });
+                const data = await res.json();
+                toast(data.message || 'Disconnected', 'info');
+                fetchStatus();
+            } catch (err) {
+                toast('Error: ' + err.message, 'error');
+            }
+        }
+
+        // 4. Quick Send
+        async function sendQuickMessage() {
+            const phone = document.getElementById('quickPhone').value.trim();
+            const message = document.getElementById('quickMessage').value.trim();
+
+            if (!phone || !message) {
+                toast('Please enter phone number and message', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('btn-send-now');
+            btn.disabled = true;
+            btn.innerText = 'Sending...';
+
+            try {
+                const res = await fetch('/api/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session: currentSession, phone, message })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    toast('✅ Message Sent Successfully!');
+                    document.getElementById('quickMessage').value = '';
+                } else {
+                    toast('❌ Error: ' + (data.error || 'Failed to send'), 'error');
+                }
+            } catch (err) {
+                toast('Network error: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = '🚀 Send Message Now';
+            }
+        }
+
+        // 5. Schedules, Templates & Logs Data
+        async function loadWebData() {
+            try {
+                const res = await fetch(`/api/web/data?session=${encodeURIComponent(currentSession)}`);
+                const data = await res.json();
+
+                renderSchedules(data.schedules || []);
+                renderTemplates(data.templates || []);
+                renderLogs(data.logs || []);
+            } catch (err) {
+                console.error('Failed to load web data', err);
+            }
+        }
+
+        function renderSchedules(schedules) {
+            const tbody = document.getElementById('schedulesTableBody');
+            if (schedules.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 30px;">No schedules active. Create one above!</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = schedules.map(s => `
+                <tr>
+                    <td><strong>${new Date(s.scheduledAt).toLocaleString()}</strong></td>
+                    <td>${s.phone}</td>
+                    <td style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${s.message}</td>
+                    <td><span class="status-badge ${s.status === 'SENT' ? 'connected' : s.status === 'PENDING' ? 'connecting' : ''}">${s.status}</span></td>
+                    <td>
+                        <button class="btn btn-outline btn-sm" onclick="deleteSchedule('${s.id}')">Cancel</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderTemplates(templates) {
+            const grid = document.getElementById('templatesGrid');
+            grid.innerHTML = templates.map(t => `
+                <div class="template-card">
+                    <div>
+                        <div class="template-title">${t.title}</div>
+                        <div class="template-body">${t.body}</div>
+                    </div>
+                    <div class="template-actions">
+                        <button class="btn btn-sm" style="flex: 1;" onclick="useTemplate('${encodeURIComponent(t.body)}')">Use Message</button>
+                        <button class="btn btn-outline btn-sm btn-danger" onclick="deleteTemplate('${t.id}')">🗑️</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderLogs(logs) {
+            const tbody = document.getElementById('logsTableBody');
+            if (logs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 30px;">No delivery logs recorded yet.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = logs.map(l => `
+                <tr>
+                    <td>${new Date(l.timestamp).toLocaleTimeString()}</td>
+                    <td>${l.phone}</td>
+                    <td style="max-width: 350px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${l.message}</td>
+                    <td><span class="status-badge ${l.status === 'SENT' ? 'connected' : ''}">${l.status}</span></td>
+                </tr>
+            `).join('');
+        }
+
+        // 6. Create Schedule
+        async function createSchedule() {
+            const phone = document.getElementById('schedPhone').value.trim();
+            const scheduledAt = document.getElementById('schedTime').value;
+            const message = document.getElementById('schedMessage').value.trim();
+
+            if (!phone || !scheduledAt || !message) {
+                toast('Please fill in phone, time, and message', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/web/schedule', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session: currentSession, phone, scheduledAt, message })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    toast('⏰ Schedule created successfully!');
+                    document.getElementById('schedPhone').value = '';
+                    document.getElementById('schedTime').value = '';
+                    document.getElementById('schedMessage').value = '';
+                    loadWebData();
+                } else {
+                    toast('Error: ' + data.error, 'error');
+                }
+            } catch (err) {
+                toast('Network error: ' + err.message, 'error');
+            }
+        }
+
+        async function deleteSchedule(id) {
+            if (!confirm('Cancel this schedule?')) return;
+            try {
+                await fetch(`/api/web/schedule/${id}`, { method: 'DELETE' });
+                toast('Schedule cancelled');
+                loadWebData();
+            } catch (err) {
+                toast('Error: ' + err.message, 'error');
+            }
+        }
+
+        function useTemplate(encodedBody) {
+            const body = decodeURIComponent(encodedBody);
+            document.getElementById('quickMessage').value = body;
+            document.getElementById('schedMessage').value = body;
+            document.getElementById('bulkMessage').value = body;
+            toast('Template applied to Message Box!');
+        }
+
+        async function showNewTemplatePrompt() {
+            const title = prompt('Enter Template Title (e.g. 📢 Important Notice):');
+            if (!title) return;
+            const body = prompt('Enter Message Content:');
+            if (!body) return;
+
+            try {
+                await fetch('/api/web/template', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, body })
+                });
+                toast('Template added!');
+                loadWebData();
+            } catch (err) {
+                toast('Error: ' + err.message, 'error');
+            }
+        }
+
+        async function deleteTemplate(id) {
+            if (!confirm('Delete this template?')) return;
+            try {
+                await fetch(`/api/web/template/${id}`, { method: 'DELETE' });
+                toast('Template deleted');
+                loadWebData();
+            } catch (err) {
+                toast('Error: ' + err.message, 'error');
+            }
+        }
+
+        // 7. Bulk Broadcast
+        async function startBroadcast() {
+            const raw = document.getElementById('bulkNumbers').value.trim();
+            const message = document.getElementById('bulkMessage').value.trim();
+            const delaySec = parseInt(document.getElementById('bulkDelay').value) || 4;
+
+            if (!raw || !message) {
+                toast('Please enter numbers and message', 'error');
+                return;
+            }
+
+            const numbers = raw.split(/[\n,]+/).map(n => n.trim()).filter(n => n.length >= 10);
+            if (numbers.length === 0) {
+                toast('No valid phone numbers found', 'error');
+                return;
+            }
+
+            if (!confirm(`Send message to ${numbers.length} numbers with ${delaySec}s delay?`)) return;
+
+            const progressBox = document.getElementById('broadcastProgress');
+            const statusText = document.getElementById('broadcastStatusText');
+            progressBox.style.display = 'block';
+
+            let sent = 0;
+            for (let i = 0; i < numbers.length; i++) {
+                const num = numbers[i];
+                statusText.innerText = `Sending: ${i + 1} / ${numbers.length} (${num})...`;
+                try {
+                    await fetch('/api/send', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ session: currentSession, phone: num, message })
+                    });
+                    sent++;
+                } catch (e) {
+                    console.error('Failed for ' + num, e);
+                }
+                if (i < numbers.length - 1) {
+                    await new Promise(r => setTimeout(r, delaySec * 1000));
+                }
+            }
+
+            statusText.innerText = `✅ Broadcast Complete! Sent ${sent} / ${numbers.length} messages.`;
+            toast(`Broadcast Complete! Sent ${sent} messages.`);
+            loadWebData();
+        }
+
+        async function clearLogs() {
+            if (!confirm('Clear all delivery logs?')) return;
+            try {
+                await fetch('/api/web/logs', { method: 'DELETE' });
+                toast('Logs cleared');
+                loadWebData();
+            } catch (err) {
+                toast('Error: ' + err.message, 'error');
+            }
+        }
+
+        // Init
+        window.addEventListener('DOMContentLoaded', () => {
+            switchLanguage('gu');
+            fetchStatus();
+            loadWebData();
+            statusPollInterval = setInterval(fetchStatus, 8000);
+        });
+    </script>
+</body>
+</html>
