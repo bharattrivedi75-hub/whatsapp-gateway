@@ -315,8 +315,12 @@ app.get('/download', (req, res) => {
 // 7. Direct APK Download Endpoint
 app.get('/download/apk', (req, res) => {
     const localApk = path.join(__dirname, 'PulseSend.apk');
+    const localUpdatedApk = path.join(__dirname, 'PulseSend-Updated.apk');
     if (fs.existsSync(localApk)) {
         return res.download(localApk, 'PulseSend.apk');
+    }
+    if (fs.existsSync(localUpdatedApk)) {
+        return res.download(localUpdatedApk, 'PulseSend.apk');
     }
     res.redirect('https://github.com/bharattrivedi75-hub/whatsapp-gateway/raw/main/PulseSend.apk');
 });
