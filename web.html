@@ -100,7 +100,7 @@
             background: var(--panel-bg); border: 1px solid var(--card-border);
             border-radius: 14px; padding: 20px; margin-bottom: 20px;
         }
-        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
         .card-title { font-size: 16px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; }
 
         /* Forms & Inputs */
@@ -167,8 +167,45 @@
         .template-body { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px; flex: 1; }
         .template-actions { display: flex; gap: 8px; }
 
+        /* Modal Popup */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.75); display: none; align-items: center; justify-content: center;
+            z-index: 1000; padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-card {
+            background: var(--panel-header); border: 1px solid var(--card-border);
+            border-radius: 16px; width: 100%; max-width: 580px; max-height: 85vh;
+            display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px rgba(0,0,0,0.6);
+        }
+        .modal-header {
+            padding: 16px 20px; border-bottom: 1px solid var(--card-border);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .modal-title { font-size: 17px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; }
+        .modal-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+        .modal-footer {
+            padding: 14px 20px; border-top: 1px solid var(--card-border);
+            display: flex; justify-content: flex-end; gap: 10px;
+        }
+
+        .contact-picker-item {
+            display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+            border-radius: 10px; cursor: pointer; transition: background 0.15s; border-bottom: 1px solid var(--card-border);
+        }
+        .contact-picker-item:hover { background: var(--card-bg); }
+        .contact-avatar {
+            width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #00a884, #056162);
+            color: #fff; font-weight: bold; display: flex; align-items: center; justify-content: center; font-size: 14px;
+        }
+        .contact-info { flex: 1; min-width: 0; }
+        .contact-name { font-weight: 600; font-size: 14px; color: #fff; }
+        .contact-phone { font-size: 12px; color: var(--text-muted); }
+        .contact-tag { font-size: 11px; padding: 2px 7px; border-radius: 4px; background: rgba(0, 168, 132, 0.15); color: var(--accent); }
+
         /* Toast Notifications */
-        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; }
+        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 1100; display: flex; flex-direction: column; gap: 8px; }
         .toast {
             background: var(--panel-header); border: 1px solid var(--accent); color: #fff;
             padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 600;
@@ -195,13 +232,13 @@
             <div class="brand-icon">⚡</div>
             <div class="brand-text">
                 <h1>PulseSend <span class="badge-web">Web</span></h1>
-                <p id="t-subtitle">WhatsApp Cloud Scheduler & Broadcast</p>
+                <p id="t-subtitle">WhatsApp Cloud Scheduler & Phonebook</p>
             </div>
         </a>
 
         <div class="header-actions">
             <!-- Language Selector -->
-            <select class="lang-select" id="langSelector" onchange="switchLanguage(this.value)">
+            <select class="lang-select" id="langSelector" aria-label="Select Language" onchange="switchLanguage(this.value)">
                 <option value="gu" selected>ગુજરાતી</option>
                 <option value="hi">हिन्दी</option>
                 <option value="en">English</option>
@@ -233,6 +270,10 @@
             <div class="nav-item" onclick="showTab('schedules')">
                 <span class="icon">⏰</span>
                 <span class="nav-label" id="nav-schedules">Schedules</span>
+            </div>
+            <div class="nav-item" onclick="showTab('contacts')">
+                <span class="icon">📖</span>
+                <span class="nav-label" id="nav-contacts">Phonebook</span>
             </div>
             <div class="nav-item" onclick="showTab('templates')">
                 <span class="icon">📋</span>
@@ -328,9 +369,14 @@
                 <h2 class="section-title" id="t-quick-title">Quick WhatsApp Send</h2>
                 <p class="section-desc" id="t-quick-desc">Send instant WhatsApp messages directly from this browser.</p>
 
-                <div class="card" style="max-width: 650px;">
+                <div class="card" style="max-width: 680px;">
                     <div class="form-group">
-                        <label class="form-label" id="t-recipients-label">Recipient Phone Number(s)</label>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <label class="form-label" id="t-recipients-label" style="margin-bottom: 0;">Recipient Phone Number(s)</label>
+                            <button type="button" class="btn btn-outline btn-sm" onclick="openContactPicker('quickPhone')" id="btn-pick-quick" style="padding: 4px 10px; font-size: 12px;">
+                                📖 Pick from Phonebook
+                            </button>
+                        </div>
                         <input type="text" class="input-text" id="quickPhone" placeholder="e.g. 9876543210 (or separate multiple with comma)">
                         <span class="form-hint" id="t-recipients-hint">Separate multiple numbers with commas. 10-digit Indian numbers auto-prefix +91.</span>
                     </div>
@@ -373,7 +419,12 @@
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                         <div class="form-group">
-                            <label class="form-label" id="t-sched-recipients">Recipients (comma separated)</label>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <label class="form-label" id="t-sched-recipients" style="margin-bottom: 0;">Recipients (comma separated)</label>
+                                <button type="button" class="btn btn-outline btn-sm" onclick="openContactPicker('schedPhone')" id="btn-pick-sched" style="padding: 4px 10px; font-size: 12px;">
+                                    📖 Pick from Phonebook
+                                </button>
+                            </div>
                             <input type="text" class="input-text" id="schedPhone" placeholder="e.g. 9876543210, 9123456780">
                         </div>
                         <div class="form-group">
@@ -416,6 +467,51 @@
                 </div>
             </section>
 
+            <!-- TAB: Phonebook & Contacts -->
+            <section id="tab-contacts" class="tab-pane">
+                <div class="card-header">
+                    <div>
+                        <h2 class="section-title" id="t-contacts-title">Phonebook & Contacts</h2>
+                        <p class="section-desc" id="t-contacts-desc">Manage your saved contacts and synced WhatsApp chats.</p>
+                    </div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="btn btn-sm btn-outline" onclick="openNativeDeviceContacts()" id="btn-device-contacts">📱 Sync Device Contacts</button>
+                        <button class="btn btn-sm" onclick="showNewContactModal()" id="btn-add-contact">➕ Add Contact</button>
+                    </div>
+                </div>
+
+                <!-- Search & Filters -->
+                <div class="card" style="margin-bottom: 16px;">
+                    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                        <input type="text" class="input-text" id="contactSearchInput" placeholder="🔍 Search by name or phone number..." oninput="filterContactsList()" style="flex: 1; min-width: 220px;">
+                        <select class="select" id="contactFilterGroup" style="width: 200px;" onchange="filterContactsList()" aria-label="Filter by Source">
+                            <option value="ALL">All Contacts (બધા)</option>
+                            <option value="WA">WhatsApp Synced</option>
+                            <option value="SAVED">Saved in Phonebook</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Contacts Table -->
+                <div class="card">
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th id="th-contact-name">Name</th>
+                                    <th id="th-contact-phone">Phone Number</th>
+                                    <th id="th-contact-group">Source / Group</th>
+                                    <th id="th-contact-action">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="contactsTableBody">
+                                <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 30px;">Loading contacts...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
             <!-- TAB 4: Templates -->
             <section id="tab-templates" class="tab-pane">
                 <div class="card-header">
@@ -438,7 +534,12 @@
 
                 <div class="card" style="max-width: 700px;">
                     <div class="form-group">
-                        <label class="form-label" id="t-bulk-numbers-label">Phone Numbers List (One per line or comma separated)</label>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <label class="form-label" id="t-bulk-numbers-label" style="margin-bottom: 0;">Phone Numbers List (One per line)</label>
+                            <button type="button" class="btn btn-outline btn-sm" onclick="openContactPicker('bulkNumbers', true)" id="btn-pick-bulk" style="padding: 4px 10px; font-size: 12px;">
+                                📖 Select Multiple Contacts
+                            </button>
+                        </div>
                         <textarea class="textarea" id="bulkNumbers" style="min-height: 120px;" placeholder="9876543210&#10;9123456789&#10;9898989898"></textarea>
                     </div>
 
@@ -495,6 +596,59 @@
         </main>
     </div>
 
+    <!-- Contact Picker Modal -->
+    <div class="modal-overlay" id="contactPickerModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span>📖</span> <span id="t-modal-picker-title">Select from Phonebook</span>
+                </div>
+                <button class="btn btn-outline btn-sm" onclick="closeContactPicker()">✕</button>
+            </div>
+            <div style="padding: 12px 20px; border-bottom: 1px solid var(--card-border); display: flex; gap: 8px;">
+                <input type="text" class="input-text" id="pickerSearchInput" placeholder="🔍 Search contact name or number..." oninput="filterPickerList()" style="padding: 8px 12px; font-size: 13px;">
+                <button class="btn btn-sm btn-outline" onclick="openNativeDeviceContacts()" style="white-space: nowrap;">📱 Phone Contacts</button>
+            </div>
+            <div class="modal-body" id="pickerContactsList" style="max-height: 400px;">
+                <p style="text-align: center; color: var(--text-muted); padding: 20px;">Loading contacts...</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline btn-sm" onclick="closeContactPicker()">Cancel</button>
+                <button class="btn btn-sm" onclick="applyContactSelection()">✅ Insert Selected</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Contact Modal -->
+    <div class="modal-overlay" id="addContactModal">
+        <div class="modal-card" style="max-width: 450px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span>➕</span> <span>Add New Contact</span>
+                </div>
+                <button class="btn btn-outline btn-sm" onclick="closeAddContactModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Contact Name</label>
+                    <input type="text" class="input-text" id="newContactName" placeholder="e.g. Ramesh Patel">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Phone Number</label>
+                    <input type="tel" class="input-text" id="newContactPhone" placeholder="e.g. 9876543210">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Group / Category</label>
+                    <input type="text" class="input-text" id="newContactGroup" placeholder="e.g. Clients, Friends, Family">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline btn-sm" onclick="closeAddContactModal()">Cancel</button>
+                <button class="btn btn-sm" onclick="saveNewContact()">Save Contact</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast container -->
     <div id="toast-container"></div>
 
@@ -502,13 +656,18 @@
         let currentLang = 'gu';
         let currentSession = 'default';
         let statusPollInterval = null;
+        let allContactsCache = [];
+        let targetInputFieldId = null;
+        let isMultiSelectTarget = false;
+        let selectedPickerPhones = new Set();
 
         const translations = {
             gu: {
-                subtitle: 'WhatsApp ક્લાઉડ શિડ્યુલર & બ્રોડકાસ્ટ',
+                subtitle: 'WhatsApp ક્લાઉડ શિડ્યુલર & ફોનબુક',
                 navLink: '📱 WhatsApp લિંક',
                 navQuick: '⚡ ઇન્સ્ટન્ટ સેન્ડ',
                 navSchedules: '⏰ શિડ્યુલ્સ',
+                navContacts: '📖 ફોનબુક',
                 navTemplates: '📋 ટેમ્પલેટ્સ',
                 navBroadcast: '👥 બલ્ક બ્રોડકાસ્ટ',
                 navLogs: '📜 સેન્ડ લૉગ્સ',
@@ -531,6 +690,9 @@
                 recipientsHint: 'એક કરતા વધુ નંબર માટે અલ્પવિરામ (,) વાપરો. ૧૦ આંકડાના નંબરમાં +91 આપમેળે લાગી જશે.',
                 msgLabel: 'મેસેજ લખાણ',
                 btnSendNow: '🚀 અત્યારે જ મોકલો',
+                btnPickQuick: '📖 ફોનબુકમાંથી પસંદ કરો',
+                btnPickSched: '📖 ફોનબુકમાંથી પસંદ કરો',
+                btnPickBulk: '📖 મલ્ટીપલ કોન્ટેક્ટ્સ પસંદ કરો',
                 schedTitle: 'ક્લાઉડ મેસેજ શિડ્યુલર',
                 schedDesc: 'નક્કી કરેલી તારીખ અને સમયે કમ્પ્યુટર બંધ હશે તો પણ સર્વર આપમેળે મેસેજ મોકલી દેશે.',
                 newSchedTitle: 'નવું શિડ્યુલ બનાવો',
@@ -539,6 +701,10 @@
                 schedMsg: 'મેસેજ લખાણ',
                 btnSaveSched: '⏰ WhatsApp મેસેજ શિડ્યુલ કરો',
                 activeScheds: 'સક્રિય શિડ્યુલ્સની યાદી',
+                contactsTitle: 'ફોનબુક & કોન્ટેક્ટ્સ',
+                contactsDesc: 'તમારા સેવ કરેલા કોન્ટેક્ટ્સ અને WhatsApp ચેટ્સની સંપૂર્ણ યાદી.',
+                btnDeviceContacts: '📱 મોબાઈલ ફોનબુક ખોલો',
+                btnAddContact: '➕ નવો કોન્ટેક્ટ ઉમેરો',
                 tplTitle: 'મેસેજ ટેમ્પલેટ્સ',
                 tplDesc: 'વારંવાર મોકલવાના મેસેજ અહીં સેવ રાખો.',
                 btnNewTpl: '➕ નવું ટેમ્પલેટ',
@@ -552,6 +718,7 @@
                 logsTitle: 'ડિલિવરી લૉગ્સ & હિસ્ટ્રી',
                 logsDesc: 'આ સર્વર પરથી ગયેલા તમામ મેસેજનો રેકોર્ડ.',
                 btnClearLogs: '🗑️ લૉગ્સ સાફ કરો',
+                modalPickerTitle: 'ફોનબુકમાંથી નંબર પસંદ કરો',
                 thTime: 'સમય',
                 thPhone: 'નંબર',
                 thMsg: 'મેસેજ',
@@ -559,10 +726,11 @@
                 thAction: 'ક્રિયા'
             },
             hi: {
-                subtitle: 'WhatsApp क्लाउड शेड्यूलर और ब्रॉडकास्ट',
+                subtitle: 'WhatsApp क्लाउड शेड्यूलर और फोनबुक',
                 navLink: '📱 WhatsApp लिंक',
                 navQuick: '⚡ इंस्टेंट सेंड',
                 navSchedules: '⏰ शेड्यूल्स',
+                navContacts: '📖 फोनबुक',
                 navTemplates: '📋 टेम्पलेट्स',
                 navBroadcast: '👥 बल्क ब्रॉडकास्ट',
                 navLogs: '📜 डिलीवरी लॉग्स',
@@ -585,6 +753,9 @@
                 recipientsHint: 'एक से अधिक नंबरों के लिए कॉमा (,) लगाएं। +91 अपने आप लग जाएगा।',
                 msgLabel: 'संदेश सामग्री',
                 btnSendNow: '🚀 तुरंत भेजें',
+                btnPickQuick: '📖 फोनबुक से चुनें',
+                btnPickSched: '📖 फोनबुक से चुनें',
+                btnPickBulk: '📖 कई संपर्क चुनें',
                 schedTitle: 'क्लाउड मैसेज शेड्यूलर',
                 schedDesc: 'कंप्यूटर बंद होने पर भी निर्धारित समय पर सर्वर अपने आप मैसेज भेज देगा।',
                 newSchedTitle: 'नया शेड्यूल बनाएं',
@@ -593,6 +764,10 @@
                 schedMsg: 'संदेश सामग्री',
                 btnSaveSched: '⏰ WhatsApp मैसेज शेड्यूल करें',
                 activeScheds: 'सक्रिय शेड्यूल की सूची',
+                contactsTitle: 'फोनबुक और संपर्क',
+                contactsDesc: 'आपके सहेजे गए संपर्कों और WhatsApp चैट की पूरी सूची।',
+                btnDeviceContacts: '📱 मोबाइल फोनबुक खोलें',
+                btnAddContact: '➕ नया संपर्क जोड़ें',
                 tplTitle: 'मैसेज टेम्पलेट्स',
                 tplDesc: 'बार-बार भेजे जाने वाले संदेश यहां सेव रखें।',
                 btnNewTpl: '➕ नया टेम्पलेट',
@@ -606,6 +781,7 @@
                 logsTitle: 'डिलीवरी लॉग्स और इतिहास',
                 logsDesc: 'इस सर्वर से भेजे गए सभी संदेशों का लाइव रिकॉर्ड।',
                 btnClearLogs: '🗑️ लॉग्स साफ़ करें',
+                modalPickerTitle: 'फोनबुक से संपर्क चुनें',
                 thTime: 'समय',
                 thPhone: 'नंबर',
                 thMsg: 'संदेश',
@@ -613,10 +789,11 @@
                 thAction: 'क्रिया'
             },
             en: {
-                subtitle: 'WhatsApp Cloud Scheduler & Broadcast',
+                subtitle: 'WhatsApp Cloud Scheduler & Phonebook',
                 navLink: '📱 WhatsApp Link',
                 navQuick: '⚡ Quick Send',
                 navSchedules: '⏰ Schedules',
+                navContacts: '📖 Phonebook',
                 navTemplates: '📋 Templates',
                 navBroadcast: '👥 Bulk Broadcast',
                 navLogs: '📜 Delivery Logs',
@@ -639,6 +816,9 @@
                 recipientsHint: 'Separate multiple numbers with commas. 10-digit numbers auto-prefix with +91.',
                 msgLabel: 'Message Content',
                 btnSendNow: '🚀 Send Message Now',
+                btnPickQuick: '📖 Pick from Phonebook',
+                btnPickSched: '📖 Pick from Phonebook',
+                btnPickBulk: '📖 Select Multiple Contacts',
                 schedTitle: 'Cloud Message Schedules',
                 schedDesc: 'Messages fire automatically from the cloud at the exact scheduled date and time.',
                 newSchedTitle: 'Create New Schedule',
@@ -647,6 +827,10 @@
                 schedMsg: 'Message Content',
                 btnSaveSched: '⏰ Schedule WhatsApp Message',
                 activeScheds: 'Active Schedules Queue',
+                contactsTitle: 'Phonebook & Contacts',
+                contactsDesc: 'Manage your saved contacts and synced WhatsApp chats.',
+                btnDeviceContacts: '📱 Open Device Contacts',
+                btnAddContact: '➕ Add Contact',
                 tplTitle: 'Message Templates',
                 tplDesc: 'Pre-saved messages for quick sending or scheduling.',
                 btnNewTpl: '➕ Add Template',
@@ -660,6 +844,7 @@
                 logsTitle: 'Delivery Logs & History',
                 logsDesc: 'Live record of all messages sent through this server.',
                 btnClearLogs: '🗑️ Clear Logs',
+                modalPickerTitle: 'Select from Phonebook',
                 thTime: 'Time',
                 thPhone: 'Recipient',
                 thMsg: 'Message',
@@ -676,6 +861,7 @@
             document.getElementById('nav-link').innerText = t.navLink;
             document.getElementById('nav-quick').innerText = t.navQuick;
             document.getElementById('nav-schedules').innerText = t.navSchedules;
+            document.getElementById('nav-contacts').innerText = t.navContacts;
             document.getElementById('nav-templates').innerText = t.navTemplates;
             document.getElementById('nav-broadcast').innerText = t.navBroadcast;
             document.getElementById('nav-logs').innerText = t.navLogs;
@@ -699,6 +885,9 @@
             document.getElementById('t-recipients-hint').innerText = t.recipientsHint;
             document.getElementById('t-message-label').innerText = t.msgLabel;
             document.getElementById('btn-send-now').innerText = t.btnSendNow;
+            document.getElementById('btn-pick-quick').innerText = t.btnPickQuick;
+            document.getElementById('btn-pick-sched').innerText = t.btnPickSched;
+            document.getElementById('btn-pick-bulk').innerText = t.btnPickBulk;
 
             document.getElementById('t-sched-title').innerText = t.schedTitle;
             document.getElementById('t-sched-desc').innerText = t.schedDesc;
@@ -708,6 +897,11 @@
             document.getElementById('t-sched-msg').innerText = t.schedMsg;
             document.getElementById('btn-save-sched').innerText = t.btnSaveSched;
             document.getElementById('t-active-scheds').innerText = t.activeScheds;
+
+            document.getElementById('t-contacts-title').innerText = t.contactsTitle;
+            document.getElementById('t-contacts-desc').innerText = t.contactsDesc;
+            document.getElementById('btn-device-contacts').innerText = t.btnDeviceContacts;
+            document.getElementById('btn-add-contact').innerText = t.btnAddContact;
 
             document.getElementById('t-tpl-title').innerText = t.tplTitle;
             document.getElementById('t-tpl-desc').innerText = t.tplDesc;
@@ -724,6 +918,7 @@
             document.getElementById('t-logs-title').innerText = t.logsTitle;
             document.getElementById('t-logs-desc').innerText = t.logsDesc;
             document.getElementById('btn-clear-logs').innerText = t.btnClearLogs;
+            document.getElementById('t-modal-picker-title').innerText = t.modalPickerTitle;
 
             document.getElementById('th-sched-time').innerText = t.thTime;
             document.getElementById('th-sched-phone').innerText = t.thPhone;
@@ -743,7 +938,7 @@
             document.getElementById('tab-' + tabId).classList.add('active');
             event.currentTarget.classList.add('active');
 
-            if (tabId === 'schedules' || tabId === 'templates' || tabId === 'logs') {
+            if (tabId === 'schedules' || tabId === 'templates' || tabId === 'logs' || tabId === 'contacts') {
                 loadWebData();
             }
         }
@@ -902,7 +1097,7 @@
             }
         }
 
-        // 5. Schedules, Templates & Logs Data
+        // 5. Schedules, Templates, Contacts & Logs Data
         async function loadWebData() {
             try {
                 const res = await fetch(`/api/web/data?session=${encodeURIComponent(currentSession)}`);
@@ -911,8 +1106,252 @@
                 renderSchedules(data.schedules || []);
                 renderTemplates(data.templates || []);
                 renderLogs(data.logs || []);
+
+                // Load contacts
+                await loadContacts();
             } catch (err) {
                 console.error('Failed to load web data', err);
+            }
+        }
+
+        async function loadContacts() {
+            try {
+                const res = await fetch(`/api/web/contacts?session=${encodeURIComponent(currentSession)}`);
+                const data = await res.json();
+                const list = [];
+
+                if (data.savedContacts) {
+                    data.savedContacts.forEach(c => list.push({ ...c, source: 'SAVED' }));
+                }
+                if (data.waContacts) {
+                    data.waContacts.forEach(c => {
+                        if (!list.some(x => x.phone === c.phone)) {
+                            list.push({ ...c, source: 'WA', group: 'WhatsApp' });
+                        }
+                    });
+                }
+                allContactsCache = list;
+                renderContactsTable(list);
+            } catch (err) {
+                console.error('Failed to load contacts', err);
+            }
+        }
+
+        function renderContactsTable(list) {
+            const tbody = document.getElementById('contactsTableBody');
+            if (!tbody) return;
+
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 30px;">No contacts found. Click "Add Contact" or link WhatsApp to sync!</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = list.map(c => {
+                const initials = (c.name || c.phone).substring(0, 2).toUpperCase();
+                return `
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div class="contact-avatar">${initials}</div>
+                            <strong>${c.name || 'Unnamed'}</strong>
+                        </div>
+                    </td>
+                    <td>+${c.phone}</td>
+                    <td><span class="contact-tag">${c.group || (c.source === 'WA' ? 'WhatsApp' : 'Phonebook')}</span></td>
+                    <td>
+                        <button class="btn btn-sm" onclick="messageContact('${c.phone}')" style="padding: 4px 10px; font-size: 12px;">💬 Message</button>
+                        ${c.source === 'SAVED' ? `<button class="btn btn-outline btn-sm btn-danger" onclick="deleteContact('${c.id}')" style="padding: 4px 8px; margin-left: 6px;">🗑️</button>` : ''}
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function filterContactsList() {
+            const query = document.getElementById('contactSearchInput').value.toLowerCase().trim();
+            const groupFilter = document.getElementById('contactFilterGroup').value;
+
+            const filtered = allContactsCache.filter(c => {
+                const matchQuery = (c.name && c.name.toLowerCase().includes(query)) || c.phone.includes(query);
+                const matchGroup = groupFilter === 'ALL' || (groupFilter === 'WA' && c.source === 'WA') || (groupFilter === 'SAVED' && c.source === 'SAVED');
+                return matchQuery && matchGroup;
+            });
+            renderContactsTable(filtered);
+        }
+
+        function messageContact(phone) {
+            document.getElementById('quickPhone').value = phone;
+            showTab('quick');
+            toast(`Contact +${phone} selected for Quick Send`);
+        }
+
+        // Contact Picker Modal
+        function openContactPicker(targetInputId, multi = false) {
+            targetInputFieldId = targetInputId;
+            isMultiSelectTarget = multi;
+            selectedPickerPhones.clear();
+
+            document.getElementById('contactPickerModal').classList.add('active');
+            filterPickerList();
+        }
+
+        function closeContactPicker() {
+            document.getElementById('contactPickerModal').classList.remove('active');
+        }
+
+        function filterPickerList() {
+            const query = (document.getElementById('pickerSearchInput')?.value || '').toLowerCase().trim();
+            const container = document.getElementById('pickerContactsList');
+
+            const filtered = allContactsCache.filter(c => {
+                return (c.name && c.name.toLowerCase().includes(query)) || c.phone.includes(query);
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<p style="text-align: center; color: var(--text-muted); padding: 30px;">No contacts match search.</p>`;
+                return;
+            }
+
+            container.innerHTML = filtered.map(c => {
+                const initials = (c.name || c.phone).substring(0, 2).toUpperCase();
+                const isSelected = selectedPickerPhones.has(c.phone);
+                return `
+                <div class="contact-picker-item" onclick="togglePickerSelect('${c.phone}')">
+                    <input type="checkbox" ${isSelected ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: var(--accent); pointer-events: none;">
+                    <div class="contact-avatar">${initials}</div>
+                    <div class="contact-info">
+                        <div class="contact-name">${c.name || 'Unnamed'}</div>
+                        <div class="contact-phone">+${c.phone}</div>
+                    </div>
+                    <span class="contact-tag">${c.group || (c.source === 'WA' ? 'WhatsApp' : 'Phonebook')}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function togglePickerSelect(phone) {
+            if (isMultiSelectTarget) {
+                if (selectedPickerPhones.has(phone)) {
+                    selectedPickerPhones.delete(phone);
+                } else {
+                    selectedPickerPhones.add(phone);
+                }
+                filterPickerList();
+            } else {
+                // Single select
+                selectedPickerPhones.clear();
+                selectedPickerPhones.add(phone);
+                applyContactSelection();
+            }
+        }
+
+        function applyContactSelection() {
+            if (!targetInputFieldId) return;
+            const target = document.getElementById(targetInputFieldId);
+            if (!target) return;
+
+            const phones = Array.from(selectedPickerPhones);
+            if (phones.length === 0) {
+                toast('No contacts selected', 'error');
+                return;
+            }
+
+            if (isMultiSelectTarget) {
+                // Multi select - append or set with newlines or commas
+                const existing = target.value.trim();
+                const separator = target.tagName.toLowerCase() === 'textarea' ? '\n' : ', ';
+                target.value = existing ? `${existing}${separator}${phones.join(separator)}` : phones.join(separator);
+                toast(`Added ${phones.length} contacts!`);
+            } else {
+                target.value = phones[0];
+                toast(`Selected +${phones[0]}`);
+            }
+
+            closeContactPicker();
+        }
+
+        // Modern Native Browser Contact Picker API
+        async function openNativeDeviceContacts() {
+            if ('contacts' in navigator && 'ContactsManager' in window) {
+                try {
+                    const props = ['name', 'tel'];
+                    const opts = { multiple: true };
+                    const contacts = await navigator.contacts.select(props, opts);
+                    if (contacts && contacts.length > 0) {
+                        const imported = [];
+                        for (const c of contacts) {
+                            if (c.tel && c.tel.length > 0) {
+                                imported.push({
+                                    name: c.name ? c.name[0] : c.tel[0],
+                                    phone: c.tel[0],
+                                    group: 'Device Contacts'
+                                });
+                            }
+                        }
+                        if (imported.length > 0) {
+                            await fetch('/api/web/contacts/import', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ session: currentSession, contactsList: imported })
+                            });
+                            toast(`Imported ${imported.length} contacts from device!`);
+                            loadContacts();
+                        }
+                    }
+                } catch (ex) {
+                    console.log('Native contact picker cancelled or error:', ex);
+                }
+            } else {
+                alert('તમારું આ બ્રાઉઝર સીધું ડિવાઇસ કોન્ટેક્ટ સિલેક્શન સપોર્ટ કરતું નથી. તમે "Add Contact" વડે અથવા Excel/CSV લિસ્ટ પેસ્ટ કરીને કોન્ટેક્ટ ઉમેરી શકો છો!');
+            }
+        }
+
+        // Add Contact Modal
+        function showNewContactModal() {
+            document.getElementById('addContactModal').classList.add('active');
+        }
+
+        function closeAddContactModal() {
+            document.getElementById('addContactModal').classList.remove('active');
+        }
+
+        async function saveNewContact() {
+            const name = document.getElementById('newContactName').value.trim();
+            const phone = document.getElementById('newContactPhone').value.trim();
+            const group = document.getElementById('newContactGroup').value.trim() || 'General';
+
+            if (!name || !phone) {
+                toast('Please enter both Name and Phone number', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/web/contacts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session: currentSession, name, phone, group })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    toast('Contact saved to Phonebook!');
+                    document.getElementById('newContactName').value = '';
+                    document.getElementById('newContactPhone').value = '';
+                    closeAddContactModal();
+                    loadContacts();
+                } else {
+                    toast('Error: ' + data.error, 'error');
+                }
+            } catch (err) {
+                toast('Network error: ' + err.message, 'error');
+            }
+        }
+
+        async function deleteContact(id) {
+            if (!confirm('Are you sure you want to delete this contact?')) return;
+            try {
+                await fetch(`/api/web/contacts/${id}`, { method: 'DELETE' });
+                toast('Contact deleted');
+                loadContacts();
+            } catch (err) {
+                toast('Error: ' + err.message, 'error');
             }
         }
 

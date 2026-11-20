@@ -63,6 +63,7 @@ async function getOrCreateSession(sessionId) {
         currentQR: null,
         connectedUser: null,
         pairingCode: null,
+        contacts: new Map(), // phone -> { id, name, phone }
         reconnectAttempts: 0,
         isStarting: false
     };
@@ -112,6 +113,58 @@ async function initSocket(session) {
                 await saveCreds();
             } catch (err) {
                 console.error(`[Session ${session.id}] Save creds error:`, err);
+            }
+        });
+
+        // WhatsApp Contacts & Chats Sync
+        sock.ev.on('messaging-history.set', ({ contacts, chats }) => {
+            if (contacts && Array.isArray(contacts)) {
+                for (const c of contacts) {
+                    if (c.id && !c.id.includes('@g.us')) {
+                        const phone = c.id.split('@')[0];
+                        const name = c.name || c.notify || c.verifiedName || phone;
+                        session.contacts.set(phone, { id: phone, name, phone });
+                    }
+                }
+            }
+        });
+
+        sock.ev.on('contacts.upsert', (newContacts) => {
+            if (Array.isArray(newContacts)) {
+                for (const c of newContacts) {
+                    if (c.id && !c.id.includes('@g.us')) {
+                        const phone = c.id.split('@')[0];
+                        const name = c.name || c.notify || c.verifiedName || phone;
+                        session.contacts.set(phone, { id: phone, name, phone });
+                    }
+                }
+            }
+        });
+
+        sock.ev.on('contacts.update', (updates) => {
+            if (Array.isArray(updates)) {
+                for (const c of updates) {
+                    if (c.id && !c.id.includes('@g.us')) {
+                        const phone = c.id.split('@')[0];
+                        const existing = session.contacts.get(phone) || { id: phone, phone };
+                        existing.name = c.name || c.notify || c.verifiedName || existing.name || phone;
+                        session.contacts.set(phone, existing);
+                    }
+                }
+            }
+        });
+
+        sock.ev.on('chats.upsert', (newChats) => {
+            if (Array.isArray(newChats)) {
+                for (const ch of newChats) {
+                    if (ch.id && !ch.id.includes('@g.us')) {
+                        const phone = ch.id.split('@')[0];
+                        if (!session.contacts.has(phone)) {
+                            const name = ch.name || phone;
+                            session.contacts.set(phone, { id: phone, name, phone });
+                        }
+                    }
+                }
             }
         });
 
@@ -358,11 +411,14 @@ const DATA_FILE = path.join(__dirname, 'server_data.json');
 function loadWebData() {
     try {
         if (fs.existsSync(DATA_FILE)) {
-            return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+            const parsed = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+            if (!parsed.contacts) parsed.contacts = [];
+            return parsed;
         }
     } catch (_) {}
     return {
         schedules: [],
+        contacts: [],
         templates: [
             { id: 't1', title: '🌅 Good Morning (શુભ સવાર)', body: 'શુભ સવાર! તમારો આજનો દિવસ ખૂબ જ આનંદમય અને સફળ રહે તેવી હાર્દિક શુભકામનાઓ! 🌸' },
             { id: 't2', title: '🙏 Festival Wishes (શુભેચ્છાઓ)', body: 'તમને અને તમારા સમગ્ર પરિવારને આજના પાવન પર્વની હાર્દિક શુભેચ્છાઓ! ઈશ્વર સદાય સુખ-શાંતિ આપે. 🪔✨' },
@@ -512,6 +568,75 @@ app.delete('/api/web/logs', (req, res) => {
     const sessionId = getSessionIdFromReq(req);
     const data = loadWebData();
     data.logs = data.logs.filter(l => (l.session || 'default') !== sessionId);
+    saveWebData(data);
+    res.json({ success: true });
+});
+
+// Contacts & Phonebook APIs
+app.get('/api/web/contacts', (req, res) => {
+    const sessionId = getSessionIdFromReq(req);
+    const session = sessions.get(sessionId);
+    const data = loadWebData();
+    const waContacts = session && session.contacts ? Array.from(session.contacts.values()) : [];
+    const savedContacts = (data.contacts || []).filter(c => (c.session || 'default') === sessionId);
+    res.json({
+        waContacts,
+        savedContacts
+    });
+});
+
+app.post('/api/web/contacts', (req, res) => {
+    try {
+        const { session, name, phone, group } = req.body;
+        if (!name || !phone) return res.status(400).json({ success: false, error: 'Name and Phone required' });
+        const data = loadWebData();
+        if (!data.contacts) data.contacts = [];
+        const newContact = {
+            id: 'c_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+            session: sanitizeSessionId(session || 'default'),
+            name: name.trim(),
+            phone: phone.trim().replace(/[^0-9]/g, ''),
+            group: (group || 'General').trim()
+        };
+        data.contacts.push(newContact);
+        saveWebData(data);
+        res.json({ success: true, contact: newContact });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/web/contacts/import', (req, res) => {
+    try {
+        const { session, contactsList, group } = req.body;
+        if (!Array.isArray(contactsList)) return res.status(400).json({ success: false, error: 'contactsList array required' });
+        const data = loadWebData();
+        if (!data.contacts) data.contacts = [];
+        let added = 0;
+        for (const item of contactsList) {
+            const rawPhone = (item.phone || '').trim().replace(/[^0-9]/g, '');
+            if (rawPhone.length >= 10) {
+                data.contacts.push({
+                    id: 'c_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+                    session: sanitizeSessionId(session || 'default'),
+                    name: (item.name || rawPhone).trim(),
+                    phone: rawPhone,
+                    group: (group || item.group || 'General').trim()
+                });
+                added++;
+            }
+        }
+        saveWebData(data);
+        res.json({ success: true, count: added });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.delete('/api/web/contacts/:id', (req, res) => {
+    const data = loadWebData();
+    if (!data.contacts) data.contacts = [];
+    data.contacts = data.contacts.filter(c => c.id !== req.params.id);
     saveWebData(data);
     res.json({ success: true });
 });
