@@ -276,20 +276,13 @@ app.post('/api/pairing-code', async (req, res) => {
         }
 
         if (!session.sock.authState.creds.registered) {
-            // Ensure completely fresh keys before generating pairing code so WhatsApp mobile never rejects with "Couldn't link device"
-            if (!session.sock.authState.creds.me) {
-                try {
-                    session.sock.ev.removeAllListeners();
-                    session.sock.end();
-                } catch (_) {}
-                try {
-                    fs.rmSync(session.authFolder, { recursive: true, force: true });
-                } catch (_) {}
-                session.sock = null;
-                session.isStarting = false;
-                await initSocket(session);
-                await new Promise(r => setTimeout(r, 2500));
+            // Wait until WebSocket is ready
+            let waitAttempts = 0;
+            while ((!session.sock.ws || session.sock.ws.readyState !== 1) && waitAttempts < 10) {
+                await new Promise(r => setTimeout(r, 500));
+                waitAttempts++;
             }
+
             const rawCode = await session.sock.requestPairingCode(cleanDigits);
             // Format code nicely (e.g. ABCD-1234)
             const formattedCode = rawCode?.match(/.{1,4}/g)?.join('-') || rawCode;
@@ -392,10 +385,10 @@ app.post('/api/disconnect', async (req, res) => {
 // 5. In-App Auto-Update endpoint
 app.get('/api/app-version', (req, res) => {
     res.json({
-        latestVersionCode: 2,
-        latestVersionName: '1.1',
+        latestVersionCode: 3,
+        latestVersionName: '1.2',
         apkUrl: `${req.protocol}://${req.get('host')}/download/apk`,
-        changelog: '1. Language Selector (ગુજરાતી, हिंदी, English)\n2. First-Launch Auto WhatsApp Link\n3. In-App 1-Click Update System',
+        changelog: '1. Multi-Device WhatsApp: Each mobile can now link its own separate WhatsApp account!\n2. Pairing code stability improvements',
         forceUpdate: false
     });
 });
@@ -670,6 +663,21 @@ app.get('/link', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`[WhatsApp Gateway] Server running at http://localhost:${PORT}`);
+    // Auto-load all existing sessions from disk
+    if (fs.existsSync(ROOT_AUTH_FOLDER)) {
+        try {
+            const dirs = fs.readdirSync(ROOT_AUTH_FOLDER);
+            for (const dir of dirs) {
+                const full = path.join(ROOT_AUTH_FOLDER, dir);
+                if (fs.statSync(full).isDirectory()) {
+                    console.log(`[WhatsApp Gateway] Auto-loading session: ${dir}`);
+                    getOrCreateSession(dir);
+                }
+            }
+        } catch (e) {
+            console.error('Error auto-loading sessions:', e);
+        }
+    }
     // initialize default session
     getOrCreateSession('default');
 });
