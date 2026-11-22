@@ -198,33 +198,32 @@ async function initSocket(session) {
 
                 console.log(`[Session ${session.id}] Connection closed (status: ${statusCode}), restartRequired: ${isRestartRequired}, reconnect: ${shouldReconnect}`);
 
+                const shouldReconnect = !isLoggedOut && (isRestartRequired || !!session.connectedUser);
+
+                console.log(`[Session ${session.id}] Connection closed (status: ${statusCode}), restartRequired: ${isRestartRequired}, reconnect: ${shouldReconnect}`);
+
                 if (shouldReconnect) {
                     session.reconnectAttempts++;
-                    // If stream restart (515) or temporary network blip, keep state CONNECTING
-                    if (isRestartRequired || session.connectedUser) {
-                        session.connectionState = 'CONNECTING';
-                    } else {
-                        session.connectionState = 'DISCONNECTED';
-                    }
-                    const delay = isRestartRequired ? 1500 : Math.min(session.reconnectAttempts * 2000, 10000);
+                    session.connectionState = 'CONNECTING';
+                    const delay = isRestartRequired ? 2000 : Math.min(session.reconnectAttempts * 3000, 15000);
                     setTimeout(() => initSocket(session), delay);
                 } else {
                     session.connectionState = 'DISCONNECTED';
                     session.connectedUser = null;
                     session.currentQR = null;
                     session.pairingCode = null;
-                    console.log(`[Session ${session.id}] Logged out. Clearing credentials...`);
+                    console.log(`[Session ${session.id}] Session idle/logged out. Stopped reconnect loop.`);
                     try {
-                        fs.rmSync(session.authFolder, { recursive: true, force: true });
+                        if (isLoggedOut) {
+                            fs.rmSync(session.authFolder, { recursive: true, force: true });
+                        }
                     } catch (_) {}
-                    setTimeout(() => initSocket(session), 3000);
                 }
             }
         });
     } catch (err) {
         session.isStarting = false;
         console.error(`[Session ${session.id}] Error starting socket:`, err);
-        setTimeout(() => initSocket(session), 5000);
     }
 }
 
