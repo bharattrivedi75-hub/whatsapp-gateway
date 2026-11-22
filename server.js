@@ -194,10 +194,6 @@ async function initSocket(session) {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const isRestartRequired = statusCode === 515;
                 const isLoggedOut = statusCode === DisconnectReason.loggedOut;
-                const shouldReconnect = !isLoggedOut;
-
-                console.log(`[Session ${session.id}] Connection closed (status: ${statusCode}), restartRequired: ${isRestartRequired}, reconnect: ${shouldReconnect}`);
-
                 const shouldReconnect = !isLoggedOut && (isRestartRequired || !!session.connectedUser);
 
                 console.log(`[Session ${session.id}] Connection closed (status: ${statusCode}), restartRequired: ${isRestartRequired}, reconnect: ${shouldReconnect}`);
@@ -355,30 +351,6 @@ app.post('/api/send', async (req, res) => {
             success: true,
             messageId: sent.key.id,
             fromPhone: session.connectedUser,
-            timestamp: sent.messageTimestamp
-        });
-    } catch (err) {
-        console.error('[Send Error]:', err);
-        return res.status(500).json({
-            success: false,
-            error: err.message || 'Failed to send WhatsApp message'
-        });
-    }
-});
-
-        let cleanDigits = phone.replace(/[^0-9]/g, '');
-        if (cleanDigits.length === 10) {
-            cleanDigits = '91' + cleanDigits;
-        }
-
-        const jid = `${cleanDigits}@s.whatsapp.net`;
-        const sent = await session.sock.sendMessage(jid, { text: message });
-
-        console.log(`[Session ${session.id}] Message sent to +${cleanDigits} at ${new Date().toLocaleTimeString()}`);
-
-        return res.json({
-            success: true,
-            messageId: sent.key.id,
             timestamp: sent.messageTimestamp
         });
     } catch (err) {
