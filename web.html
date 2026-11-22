@@ -935,8 +935,20 @@
         function showTab(tabId) {
             document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            document.getElementById('tab-' + tabId).classList.add('active');
-            event.currentTarget.classList.add('active');
+            const pane = document.getElementById('tab-' + tabId);
+            if (pane) pane.classList.add('active');
+
+            const navItems = document.querySelectorAll('.sidebar .nav-item');
+            navItems.forEach(el => {
+                const onclick = el.getAttribute('onclick') || '';
+                if (onclick.includes(`'${tabId}'`)) {
+                    el.classList.add('active');
+                }
+            });
+
+            try {
+                localStorage.setItem('pulsesend_web_last_tab', tabId);
+            } catch (_) {}
 
             if (tabId === 'schedules' || tabId === 'templates' || tabId === 'logs' || tabId === 'contacts') {
                 loadWebData();
@@ -1551,6 +1563,12 @@
         // Init
         window.addEventListener('DOMContentLoaded', () => {
             switchLanguage('gu');
+            try {
+                const savedTab = localStorage.getItem('pulsesend_web_last_tab');
+                if (savedTab && document.getElementById('tab-' + savedTab)) {
+                    showTab(savedTab);
+                }
+            } catch (_) {}
             fetchStatus();
             loadWebData();
             statusPollInterval = setInterval(fetchStatus, 8000);
