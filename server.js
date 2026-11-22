@@ -266,19 +266,66 @@ app.post('/api/pairing-code', async (req, res) => {
             });
         }
 
+        // If socket is dead, closed, or disconnected, re-initialize fresh live socket
+        const isWsOpen = session.sock && session.sock.ws && session.sock.ws.readyState === 1;
+        if (!isWsOpen || session.connectionState === 'DISCONNECTED') {
+            console.log(`[Session ${session.id}] Socket is disconnected/closed. Re-initializing fresh socket for pairing code...`);
+            if (!session.sock?.authState?.creds?.registered) {
+                try {
+                    fs.rmSync(session.authFolder, { recursive: true, force: true });
+                    fs.mkdirSync(session.authFolder, { recursive: true });
+                } catch (_) {}
+            }
+            session.isStarting = false;
+            await initSocket(session);
+        }
+
+        // Wait until WebSocket is ready
+        let waitAttempts = 0;
+        while ((!session.sock?.ws || session.sock.ws.readyState !== 1) && waitAttempts < 25) {
+            await new Promise(r => setTimeout(r, 500));
+            waitAttempts++;
+        }
+
+        if (!session.sock || !session.sock.ws || session.sock.ws.readyState !== 1) {
+            // One more forced reset and restart if still not connected
+            try {
+                fs.rmSync(session.authFolder, { recursive: true, force: true });
+                fs.mkdirSync(session.authFolder, { recursive: true });
+            } catch (_) {}
+            session.isStarting = false;
+            await initSocket(session);
+            let retryWait = 0;
+            while ((!session.sock?.ws || session.sock.ws.readyState !== 1) && retryWait < 20) {
+                await new Promise(r => setTimeout(r, 500));
+                retryWait++;
+            }
+        }
+
         if (!session.sock) {
             return res.status(503).json({ success: false, error: 'Socket is initializing, please try again in 5 seconds.' });
         }
 
         if (!session.sock.authState.creds.registered) {
-            // Wait until WebSocket is ready
-            let waitAttempts = 0;
-            while ((!session.sock.ws || session.sock.ws.readyState !== 1) && waitAttempts < 10) {
-                await new Promise(r => setTimeout(r, 500));
-                waitAttempts++;
+            let rawCode;
+            try {
+                rawCode = await session.sock.requestPairingCode(cleanDigits);
+            } catch (firstErr) {
+                console.warn(`[Session ${session.id}] First requestPairingCode attempt failed (${firstErr.message}), resetting auth and retrying...`);
+                try {
+                    fs.rmSync(session.authFolder, { recursive: true, force: true });
+                    fs.mkdirSync(session.authFolder, { recursive: true });
+                } catch (_) {}
+                session.isStarting = false;
+                await initSocket(session);
+                let retryWait = 0;
+                while ((!session.sock?.ws || session.sock.ws.readyState !== 1) && retryWait < 25) {
+                    await new Promise(r => setTimeout(r, 500));
+                    retryWait++;
+                }
+                rawCode = await session.sock.requestPairingCode(cleanDigits);
             }
 
-            const rawCode = await session.sock.requestPairingCode(cleanDigits);
             // Format code nicely (e.g. ABCD-1234)
             const formattedCode = rawCode?.match(/.{1,4}/g)?.join('-') || rawCode;
             session.pairingCode = formattedCode;
