@@ -233,7 +233,23 @@ async function initSocket(session) {
 // 1. Connection status
 app.get('/api/status', async (req, res) => {
     const sessionId = getSessionIdFromReq(req);
-    const session = await getOrCreateSession(sessionId);
+    let session = await getOrCreateSession(sessionId);
+
+    // Smart fallback: if requested session is not connected, but default or another session IS connected,
+    // report the connected session so mobile sees connected status
+    if (session.connectionState !== 'CONNECTED') {
+        const def = sessions.get('default');
+        if (def && def.connectionState === 'CONNECTED') {
+            session = def;
+        } else {
+            for (const [_, s] of sessions.entries()) {
+                if (s.connectionState === 'CONNECTED') {
+                    session = s;
+                    break;
+                }
+            }
+        }
+    }
 
     res.json({
         sessionId: session.id,
@@ -324,12 +340,37 @@ app.post('/api/send', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Both phone and message are required' });
         }
 
-        const session = await getOrCreateSession(sessionId);
+        let session = await getOrCreateSession(sessionId);
+
+        // Smart fallback: if requested session is not connected, use default or any connected session
+        if (session.connectionState !== 'CONNECTED') {
+            const def = sessions.get('default');
+            if (def && def.connectionState === 'CONNECTED') {
+                console.log(`[Send Fallback] Session [${sessionId}] not connected, using connected session [default] (+${def.connectedUser})`);
+                session = def;
+            } else {
+                for (const [id, s] of sessions.entries()) {
+                    if (s.connectionState === 'CONNECTED' && s.sock) {
+                        console.log(`[Send Fallback] Using connected session [${id}] (+${s.connectedUser})`);
+                        session = s;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Cold-start handling: If session is currently CONNECTING (e.g. Render waking from sleep), wait up to 20 seconds
+        let waitSeconds = 0;
+        while (session.connectionState === 'CONNECTING' && waitSeconds < 20) {
+            console.log(`[Send Delay] Waiting for WhatsApp connection to establish (attempt ${waitSeconds + 1}/20)...`);
+            await new Promise(r => setTimeout(r, 1000));
+            waitSeconds++;
+        }
 
         if (session.connectionState !== 'CONNECTED' || !session.sock) {
             return res.status(503).json({
                 success: false,
-                error: `WhatsApp session [${sessionId}] is not connected. Please link WhatsApp first.`,
+                error: `WhatsApp session [${session.id}] is not connected (${session.connectionState}). Please link WhatsApp.`,
                 status: session.connectionState
             });
         }
@@ -680,4 +721,15 @@ app.listen(PORT, '0.0.0.0', () => {
     }
     // initialize default session
     getOrCreateSession('default');
+
+    // Keep-alive self-ping every 8 minutes to prevent Render Free Tier from sleeping
+    const PING_URL = process.env.RENDER_EXTERNAL_URL || 'https://whatsapp-gateway-qgmd.onrender.com';
+    setInterval(() => {
+        try {
+            fetch(`${PING_URL}/api/status`)
+                .then(r => r.json())
+                .then(data => console.log(`[Keep-Alive] Ping success (${data.status}, phone: +${data.phone})`))
+                .catch(err => console.log(`[Keep-Alive] Ping error: ${err.message}`));
+        } catch (_) {}
+    }, 8 * 60 * 1000);
 });
