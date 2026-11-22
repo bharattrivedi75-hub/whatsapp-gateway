@@ -482,11 +482,18 @@ app.get('/api/sessions', (req, res) => {
 
 // 5. In-App Auto-Update endpoint
 app.get('/api/app-version', (req, res) => {
+    try {
+        const versionFile = path.join(__dirname, 'version.json');
+        if (fs.existsSync(versionFile)) {
+            const data = JSON.parse(fs.readFileSync(versionFile, 'utf8'));
+            return res.json(data);
+        }
+    } catch (_) {}
     res.json({
-        latestVersionCode: 3,
-        latestVersionName: '1.2',
-        apkUrl: `${req.protocol}://${req.get('host')}/download/apk`,
-        changelog: '1. Multi-Device WhatsApp: Each mobile can now link its own separate WhatsApp account!\n2. Pairing code stability improvements',
+        latestVersionCode: 5,
+        latestVersionName: '1.4',
+        apkUrl: 'https://github.com/bharattrivedi75-hub/whatsapp-gateway/raw/main/PulseSend.apk',
+        changelog: '૧. About Us અને Developer (RBT SOFTTECH - Mr. Bharat) માહિતી ઉમેરી\n૨. ઓટોમેટિક GitHub અપડેટ નોટિફિકેશન સિસ્ટમ\n૩. મલ્ટી-ડિવાઇસ WhatsApp પેરિંગ કોડ ફિક્સ',
         forceUpdate: false
     });
 });
