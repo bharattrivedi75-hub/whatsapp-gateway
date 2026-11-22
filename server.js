@@ -230,26 +230,10 @@ async function initSocket(session) {
 
 // ---------------------- REST APIs ----------------------
 
-// 1. Connection status
+// 1. Connection status - Strictly isolated per device session!
 app.get('/api/status', async (req, res) => {
     const sessionId = getSessionIdFromReq(req);
-    let session = await getOrCreateSession(sessionId);
-
-    // Smart fallback: if requested session is not connected, but default or another session IS connected,
-    // report the connected session so mobile sees connected status
-    if (session.connectionState !== 'CONNECTED') {
-        const def = sessions.get('default');
-        if (def && def.connectionState === 'CONNECTED') {
-            session = def;
-        } else {
-            for (const [_, s] of sessions.entries()) {
-                if (s.connectionState === 'CONNECTED') {
-                    session = s;
-                    break;
-                }
-            }
-        }
-    }
+    const session = await getOrCreateSession(sessionId);
 
     res.json({
         sessionId: session.id,
@@ -330,7 +314,7 @@ app.post('/api/pairing-code', async (req, res) => {
     }
 });
 
-// 3. Send WhatsApp message
+// 3. Send WhatsApp message - Strictly from this device's own session!
 app.post('/api/send', async (req, res) => {
     try {
         const sessionId = getSessionIdFromReq(req);
@@ -340,29 +324,12 @@ app.post('/api/send', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Both phone and message are required' });
         }
 
-        let session = await getOrCreateSession(sessionId);
+        const session = await getOrCreateSession(sessionId);
 
-        // Smart fallback: if requested session is not connected, use default or any connected session
-        if (session.connectionState !== 'CONNECTED') {
-            const def = sessions.get('default');
-            if (def && def.connectionState === 'CONNECTED') {
-                console.log(`[Send Fallback] Session [${sessionId}] not connected, using connected session [default] (+${def.connectedUser})`);
-                session = def;
-            } else {
-                for (const [id, s] of sessions.entries()) {
-                    if (s.connectionState === 'CONNECTED' && s.sock) {
-                        console.log(`[Send Fallback] Using connected session [${id}] (+${s.connectedUser})`);
-                        session = s;
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Cold-start handling: If session is currently CONNECTING (e.g. Render waking from sleep), wait up to 20 seconds
+        // Cold-start handling: If this device's session is currently CONNECTING (e.g. Render waking from sleep), wait up to 20 seconds
         let waitSeconds = 0;
         while (session.connectionState === 'CONNECTING' && waitSeconds < 20) {
-            console.log(`[Send Delay] Waiting for WhatsApp connection to establish (attempt ${waitSeconds + 1}/20)...`);
+            console.log(`[Send Delay] [${session.id}] Waiting for WhatsApp connection to establish (attempt ${waitSeconds + 1}/20)...`);
             await new Promise(r => setTimeout(r, 1000));
             waitSeconds++;
         }
@@ -374,6 +341,31 @@ app.post('/api/send', async (req, res) => {
                 status: session.connectionState
             });
         }
+
+        let cleanDigits = phone.replace(/[^0-9]/g, '');
+        if (cleanDigits.length === 10) {
+            cleanDigits = '91' + cleanDigits;
+        }
+
+        const jid = `${cleanDigits}@s.whatsapp.net`;
+        const sent = await session.sock.sendMessage(jid, { text: message });
+
+        console.log(`[Session ${session.id}] Message sent to +${cleanDigits} from +${session.connectedUser} at ${new Date().toLocaleTimeString()}`);
+
+        return res.json({
+            success: true,
+            messageId: sent.key.id,
+            fromPhone: session.connectedUser,
+            timestamp: sent.messageTimestamp
+        });
+    } catch (err) {
+        console.error('[Send Error]:', err);
+        return res.status(500).json({
+            success: false,
+            error: err.message || 'Failed to send WhatsApp message'
+        });
+    }
+});
 
         let cleanDigits = phone.replace(/[^0-9]/g, '');
         if (cleanDigits.length === 10) {
