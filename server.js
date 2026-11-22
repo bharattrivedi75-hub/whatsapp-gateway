@@ -391,28 +391,75 @@ app.post('/api/send', async (req, res) => {
     }
 });
 
-// 4. Disconnect / Logout session
+// 4. Disconnect / Logout session (Supports disconnecting by sessionId, by phone number, or all!)
 app.post('/api/disconnect', async (req, res) => {
     try {
         const sessionId = getSessionIdFromReq(req);
-        const session = sessions.get(sessionId);
+        const { all, phone } = req.body || {};
 
-        if (session && session.sock) {
+        let sessionsToDisconnect = [];
+
+        if (all) {
+            sessionsToDisconnect = Array.from(sessions.values());
+        } else if (phone) {
+            const clean = phone.replace(/[^0-9]/g, '');
+            for (const s of sessions.values()) {
+                if (s.connectedUser && (s.connectedUser === clean || s.connectedUser.endsWith(clean))) {
+                    sessionsToDisconnect.push(s);
+                }
+            }
+        } else {
+            const s = sessions.get(sessionId);
+            if (s) {
+                sessionsToDisconnect.push(s);
+            } else {
+                for (const act of sessions.values()) {
+                    if (act.connectionState === 'CONNECTED') {
+                        sessionsToDisconnect.push(act);
+                    }
+                }
+            }
+        }
+
+        let count = 0;
+        for (const session of sessionsToDisconnect) {
+            console.log(`[Disconnect] Disconnecting session [${session.id}] (phone: +${session.connectedUser})...`);
             try {
-                await session.sock.logout();
+                if (session.sock) {
+                    session.sock.ev.removeAllListeners();
+                    await session.sock.logout();
+                }
             } catch (_) {}
             try {
                 fs.rmSync(session.authFolder, { recursive: true, force: true });
             } catch (_) {}
-            sessions.delete(sessionId);
-            // Re-init clean session
-            setTimeout(() => getOrCreateSession(sessionId), 1000);
+            session.connectedUser = null;
+            session.connectionState = 'DISCONNECTED';
+            session.currentQR = null;
+            session.pairingCode = null;
+            sessions.delete(session.id);
+            count++;
+            setTimeout(() => getOrCreateSession(session.id), 1000);
         }
 
-        res.json({ success: true, message: `Session [${sessionId}] disconnected and cleared` });
+        res.json({ success: true, message: `Disconnected ${count} session(s) successfully` });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
+});
+
+// 4.1 List active sessions
+app.get('/api/sessions', (req, res) => {
+    const list = [];
+    for (const [id, s] of sessions.entries()) {
+        list.push({
+            id: s.id,
+            status: s.connectionState,
+            connected: s.connectionState === 'CONNECTED',
+            phone: s.connectedUser
+        });
+    }
+    res.json({ success: true, sessions: list });
 });
 
 // 5. In-App Auto-Update endpoint

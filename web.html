@@ -1053,7 +1053,7 @@
                 const res = await fetch('/api/disconnect', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ session: currentSession })
+                    body: JSON.stringify({ session: currentSession, all: true })
                 });
                 const data = await res.json();
                 toast(data.message || 'Disconnected', 'info');
