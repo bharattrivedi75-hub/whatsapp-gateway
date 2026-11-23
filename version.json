@@ -1,7 +1,7 @@
 {
-  "latestVersionCode": 5,
-  "latestVersionName": "1.4",
+  "latestVersionCode": 6,
+  "latestVersionName": "1.5",
   "apkUrl": "https://github.com/bharattrivedi75-hub/whatsapp-gateway/raw/main/PulseSend.apk",
-  "changelog": "૧. About Us અને Developer (RBT SOFTTECH - Mr. Bharat) માહિતી ઉમેરી\n૨. ઓટોમેટિક GitHub અપડેટ નોટિફિકેશન સિસ્ટમ\n૩. મલ્ટી-ડિવાઇસ WhatsApp પેરિંગ કોડ ફિક્સ",
+  "changelog": "૧. શિડ્યુલ સમય પૂરો થતાં જ આપમેળે બીજા દિવસની નવી તારીખ આવી જશે.\n૨. ગ્રૂપના તમામ ૧૯ સભ્યોને ૧૦૦% મેસેજ મોકલવા બેકગ્રાઉન્ડ સર્વિસ ઉમેરી.\n૩. રાત્રે ફોન ઊંઘમાં (Doze Mode) હોય તો પણ ઇન્ટરનેટ/DNS આપમેળે જગાડીને મેસેજ મોકલશે.",
   "forceUpdate": false
 }
