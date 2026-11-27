@@ -1,7 +1,7 @@
 {
-  "latestVersionCode": 6,
-  "latestVersionName": "1.5",
+  "latestVersionCode": 7,
+  "latestVersionName": "1.6",
   "apkUrl": "https://github.com/bharattrivedi75-hub/whatsapp-gateway/raw/main/PulseSend.apk",
-  "changelog": "૧. શિડ્યુલ સમય પૂરો થતાં જ આપમેળે બીજા દિવસની નવી તારીખ આવી જશે.\n૨. ગ્રૂપના તમામ ૧૯ સભ્યોને ૧૦૦% મેસેજ મોકલવા બેકગ્રાઉન્ડ સર્વિસ ઉમેરી.\n૩. રાત્રે ફોન ઊંઘમાં (Doze Mode) હોય તો પણ ઇન્ટરનેટ/DNS આપમેળે જગાડીને મેસેજ મોકલશે.",
+  "changelog": "૧. નવો Clean Business Dashboard લુક (Fintech સ્ટાઇલ વ્હાઇટ & રોયલ સ્લેટ-ગ્રીન થીમ).\n૨. હોમ સ્ક્રીન પર નવા KPI સ્ટેટિસ્ટિક્સ કાર્ડ્સ (Active, Dispatched, Contacts).\n૩. નવું બ્રાન્ડ ટોપ હેડર (લાઇવ કનેક્શન સ્ટેટસ સાથે) અને સ્ટાઇલિશ ફ્લોટિંગ બોટમ બાર.\n૪. એક્ટિવિટી અને લૉગ્સ માટે નવી કલર-કોડેડ ટાઇમલાઇન ડિઝાઇન.",
   "forceUpdate": false
 }
